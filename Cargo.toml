@@ -3,6 +3,12 @@ name = "node-provider-labeler"
 version = "0.1.0"
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
+kube = { version = "0.90.0", features = ["runtime", "derive"] }
+k8s-openapi = { version = "0.21.1", features = ["v1_26"] }
+tokio = { version = "1.37.0", features = ["full"] }
+color-eyre = "0.6.3"
+tracing = "0.1.40"
+tracing-subscriber = "0.3.18"
+thiserror = "1.0.59"
+futures = "0.3.30"

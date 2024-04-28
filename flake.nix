@@ -26,6 +26,7 @@
             darwin.apple_sdk.frameworks.SystemConfiguration
           ];
           buildInputs = with pkgs; [
+            kubectl
             rust-bin.stable.latest.default
             rust-analyzer
           ];
