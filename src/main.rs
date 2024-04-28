@@ -9,7 +9,7 @@ use kube::{
 };
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
-use tracing::info;
+use tracing::{info, warn};
 
 type AppResult<T> = color_eyre::Result<T>;
 
@@ -17,6 +17,8 @@ type AppResult<T> = color_eyre::Result<T>;
 enum Error {
     #[error("kube error: {0}")]
     Kube(#[from] kube::Error),
+    #[error("MissingObjectKey: {0}")]
+    MissingObjectKey(&'static str),
 }
 
 struct Data {
@@ -24,12 +26,32 @@ struct Data {
 }
 
 async fn reconcile(node: Arc<Node>, _data: Arc<Data>) -> Result<Action, Error> {
-    info!("reconciling {:?}", node.metadata.name);
+    let node_name = node
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
+
+    info!("reconciling {:?}", node_name);
+
+    let provider_id = node
+        .spec
+        .as_ref()
+        .ok_or_else(|| Error::MissingObjectKey(".spec"))?
+        .provider_id
+        .as_ref();
+
+    if let Some(provider_id) = provider_id {
+        info!("provider_id: {}", provider_id);
+    } else {
+        warn!("no provider_id found for node: {node_name}");
+    }
+
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
 fn error_policy(_object: Arc<Node>, _error: &Error, _ctx: Arc<Data>) -> Action {
-    Action::requeue(Duration::from_secs(1))
+    Action::requeue(Duration::from_secs(5))
 }
 
 #[tokio::main]
@@ -40,9 +62,8 @@ async fn main() -> AppResult<()> {
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
 
-    let config = Config::default().concurrency(2);
-    let mut _c = Controller::new(node, watcher::Config::default())
-        .with_config(config)
+    Controller::new(node, watcher::Config::default())
+        .with_config(Config::default().concurrency(2))
         .shutdown_on_signal()
         .run(reconcile, error_policy, Arc::new(Data { client }))
         .for_each(|res| async move {
@@ -52,6 +73,7 @@ async fn main() -> AppResult<()> {
             }
         })
         .await;
+
     info!("stopping");
 
     Ok(())
