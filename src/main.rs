@@ -1,3 +1,6 @@
+mod provider_id;
+
+use crate::provider_id::ProviderID;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
@@ -5,13 +8,12 @@ use kube::{
         controller::{Action, Config},
         watcher, Controller,
     },
-    Api, Client,
+    Api, Client, ResourceExt,
 };
+use provider_id::ProviderIDError;
 use std::{sync::Arc, time::Duration};
 use thiserror::Error;
-use tracing::{info, warn};
-
-type AppResult<T> = color_eyre::Result<T>;
+use tracing::{debug, error, info, warn};
 
 #[derive(Error, Debug)]
 enum Error {
@@ -19,6 +21,8 @@ enum Error {
     Kube(#[from] kube::Error),
     #[error("MissingObjectKey: {0}")]
     MissingObjectKey(&'static str),
+    #[error("ProviderIDError: {0}")]
+    ProviderID(#[from] ProviderIDError),
 }
 
 struct Data {
@@ -32,7 +36,7 @@ async fn reconcile(node: Arc<Node>, _data: Arc<Data>) -> Result<Action, Error> {
         .as_ref()
         .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
 
-    info!("reconciling {:?}", node_name);
+    debug!("reconciling {node_name}");
 
     let provider_id = node
         .spec
@@ -42,20 +46,23 @@ async fn reconcile(node: Arc<Node>, _data: Arc<Data>) -> Result<Action, Error> {
         .as_ref();
 
     if let Some(provider_id) = provider_id {
-        info!("provider_id: {}", provider_id);
+        let provider_id = ProviderID::new(provider_id)?;
+        info!("provider id: {}", provider_id);
     } else {
-        warn!("no provider_id found for node: {node_name}");
+        warn!("no provider id found for node: {node_name}");
     }
 
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-fn error_policy(_object: Arc<Node>, _error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Data>) -> Action {
+    let name = object.name_any();
+    error!({ node = name }, "error processing node: {}", error);
     Action::requeue(Duration::from_secs(5))
 }
 
 #[tokio::main]
-async fn main() -> AppResult<()> {
+async fn main() -> color_eyre::Result<()> {
     tracing_subscriber::fmt::init();
 
     info!("starting");
