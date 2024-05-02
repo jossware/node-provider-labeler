@@ -4,6 +4,7 @@ use crate::provider_id::ProviderID;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
+    api::{ObjectMeta, PartialObjectMetaExt, Patch, PatchParams},
     runtime::{
         controller::{Action, Config},
         watcher, Controller,
@@ -15,6 +16,8 @@ use std::{sync::Arc, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
+const MANAGER: &str = "node-provider-labeler";
+
 #[derive(Error, Debug)]
 enum Error {
     #[error("kube error: {0}")]
@@ -25,18 +28,19 @@ enum Error {
     ProviderID(#[from] ProviderIDError),
 }
 
-struct Data {
+struct Ctx {
     client: Client,
+    label_name: String,
 }
 
-async fn reconcile(node: Arc<Node>, _data: Arc<Data>) -> Result<Action, Error> {
+async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
     let node_name = node
         .metadata
         .name
         .as_ref()
         .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
 
-    debug!("reconciling {node_name}");
+    debug!({ node = node_name }, "reconciling");
 
     let provider_id = node
         .spec
@@ -47,15 +51,37 @@ async fn reconcile(node: Arc<Node>, _data: Arc<Data>) -> Result<Action, Error> {
 
     if let Some(provider_id) = provider_id {
         let provider_id = ProviderID::new(provider_id)?;
-        info!("provider id: {}", provider_id);
+        info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.name() }, "found provider id");
+
+        // .spec.providerID is immutable except from "" to valid
+        // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
+
+        let value = provider_id.last().to_string();
+        let mut labels = node.metadata.labels.clone().unwrap_or_default();
+        labels.insert(ctx.label_name.clone(), value);
+
+        let patch = ObjectMeta {
+            labels: Some(labels),
+            ..Default::default()
+        }
+        .into_request_partial::<Node>();
+
+        let node_api: Api<Node> = Api::all(ctx.client.clone());
+        node_api
+            .patch_metadata(
+                node_name,
+                &PatchParams::apply(MANAGER),
+                &Patch::Apply(&patch),
+            )
+            .await?;
     } else {
-        warn!("no provider id found for node: {node_name}");
+        warn!({ node = node_name }, "no provider id found");
     }
 
     Ok(Action::requeue(Duration::from_secs(300)))
 }
 
-fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Data>) -> Action {
+fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
     let name = object.name_any();
     error!({ node = name }, "error processing node: {}", error);
     Action::requeue(Duration::from_secs(5))
@@ -68,14 +94,22 @@ async fn main() -> color_eyre::Result<()> {
     info!("starting");
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
+    let label_name = "provider-id".to_string();
 
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
         .shutdown_on_signal()
-        .run(reconcile, error_policy, Arc::new(Data { client }))
+        .run(
+            reconcile,
+            error_policy,
+            Arc::new(Ctx { client, label_name }),
+        )
         .for_each(|res| async move {
             match res {
-                Ok(o) => info!("reconciled {:?}", o),
+                Ok(o) => {
+                    let node_name = o.0.clone().name;
+                    info!({ node = node_name }, "reconciled");
+                }
                 Err(e) => info!("reconcile error: {:?}", e),
             }
         })
