@@ -12,7 +12,7 @@ use kube::{
     Api, Client, ResourceExt,
 };
 use provider_id::ProviderIDError;
-use std::{sync::Arc, time::Duration};
+use std::{str::FromStr, sync::Arc, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
@@ -28,12 +28,28 @@ enum Error {
     ProviderID(#[from] ProviderIDError),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 enum ProviderIDPart {
     All,
     Last,
     First,
     Nth(usize),
+}
+
+impl FromStr for ProviderIDPart {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "all" => Ok(Self::All),
+            "last" => Ok(Self::Last),
+            "first" => Ok(Self::First),
+            _ => {
+                let idx = s.parse::<usize>().map_err(|_| ())?;
+                Ok(Self::Nth(idx))
+            }
+        }
+    }
 }
 
 struct Ctx {
@@ -144,4 +160,55 @@ async fn main() -> color_eyre::Result<()> {
     info!("stopping");
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_provider_id_part() {
+        let valid = [
+            ("all", ProviderIDPart::All),
+            ("ALL", ProviderIDPart::All),
+            ("ALl", ProviderIDPart::All),
+            ("last", ProviderIDPart::Last),
+            ("LAST", ProviderIDPart::Last),
+            ("Last", ProviderIDPart::Last),
+            ("first", ProviderIDPart::First),
+            ("FIRST", ProviderIDPart::First),
+            ("First", ProviderIDPart::First),
+            ("0", ProviderIDPart::Nth(0)),
+            ("1", ProviderIDPart::Nth(1)),
+            ("2", ProviderIDPart::Nth(2)),
+            ("3", ProviderIDPart::Nth(3)),
+            ("4", ProviderIDPart::Nth(4)),
+            ("5", ProviderIDPart::Nth(5)),
+            ("6", ProviderIDPart::Nth(6)),
+            ("7", ProviderIDPart::Nth(7)),
+            ("8", ProviderIDPart::Nth(8)),
+            ("9", ProviderIDPart::Nth(9)),
+        ];
+
+        for test in valid {
+            let (input, expected) = test;
+            let p = ProviderIDPart::from_str(input).unwrap();
+            assert_eq!(p, expected);
+        }
+
+        let invalid = [
+            ("huh", ()),
+            ("", ()),
+            (" ", ()),
+            ("-", ()),
+            ("fsdfds", ()),
+            ("akljsf dajdk  sjdf", ()),
+        ];
+        for test in invalid {
+            let (input, expected) = test;
+            let p = ProviderIDPart::from_str(input);
+            assert!(p.is_err());
+            assert_eq!(Err(expected), p);
+        }
+    }
 }
