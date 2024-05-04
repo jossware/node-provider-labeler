@@ -3,7 +3,7 @@ use thiserror::Error;
 #[derive(Debug)]
 pub struct ProviderID {
     provider_id: String,
-    name: String,
+    provider: String,
     node_id: String,
     id_parts: Vec<String>,
 }
@@ -21,10 +21,10 @@ impl ProviderID {
             return Err(ProviderIDError::Invalid);
         }
 
-        let name = parts[0].to_string();
+        let provider = parts[0].to_string();
         let node_id = parts[1].to_string();
 
-        if name.is_empty() || node_id.is_empty() {
+        if provider.is_empty() || node_id.is_empty() {
             return Err(ProviderIDError::Invalid);
         }
 
@@ -32,7 +32,7 @@ impl ProviderID {
 
         let pid = Self {
             provider_id: provider_id.into(),
-            name,
+            provider,
             node_id,
             id_parts,
         };
@@ -40,8 +40,8 @@ impl ProviderID {
         Ok(pid)
     }
 
-    pub fn name(&self) -> &str {
-        &self.name
+    pub fn provider(&self) -> &str {
+        &self.provider
     }
 
     pub fn node_id(&self) -> &str {
@@ -93,7 +93,7 @@ mod tests {
         // <ProviderName>://<ProviderSpecificNodeID>
         let provider_id =
             ProviderID::new("kind://podman/kind-cluster/kind-cluster-control-plane").unwrap();
-        assert_eq!("kind", provider_id.name);
+        assert_eq!("kind", provider_id.provider);
         assert_eq!(
             provider_id.to_string(),
             "kind://podman/kind-cluster/kind-cluster-control-plane"
@@ -125,7 +125,7 @@ mod tests {
         .iter()
         .for_each(|i| {
             let provider_id = ProviderID::new(i.0).unwrap();
-            assert_eq!(provider_id.name(), i.1);
+            assert_eq!(provider_id.provider(), i.1);
         });
     }
 

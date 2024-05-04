@@ -60,7 +60,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
 
     if let Some(provider_id) = provider_id {
         let provider_id = ProviderID::new(provider_id)?;
-        info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.name() }, "found provider id");
+        info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
 
         // .spec.providerID is immutable except from "" to valid
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
