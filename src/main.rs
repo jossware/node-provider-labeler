@@ -28,9 +28,18 @@ enum Error {
     ProviderID(#[from] ProviderIDError),
 }
 
+#[derive(Debug, Clone)]
+enum ProviderIDPart {
+    All,
+    Last,
+    First,
+    Nth(usize),
+}
+
 struct Ctx {
     client: Client,
     label_name: String,
+    provider_id_value: ProviderIDPart,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
@@ -56,9 +65,22 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         // .spec.providerID is immutable except from "" to valid
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
 
-        let value = provider_id.last().to_string();
+        let value = match &ctx.provider_id_value {
+            ProviderIDPart::All => provider_id.node_id(),
+            ProviderIDPart::Last => provider_id.last(),
+            ProviderIDPart::First => provider_id.nth(0).unwrap_or_else(|| provider_id.node_id()),
+            ProviderIDPart::Nth(i) => {
+                if let Some(v) = provider_id.nth(*i) {
+                    v
+                } else {
+                    warn!({ node = node_name, index = i }, "nth index out of bounds");
+                    provider_id.node_id()
+                }
+            }
+        };
+
         let mut labels = node.metadata.labels.clone().unwrap_or_default();
-        labels.insert(ctx.label_name.clone(), value);
+        labels.insert(ctx.label_name.clone(), value.to_string());
 
         let patch = ObjectMeta {
             labels: Some(labels),
@@ -102,7 +124,11 @@ async fn main() -> color_eyre::Result<()> {
         .run(
             reconcile,
             error_policy,
-            Arc::new(Ctx { client, label_name }),
+            Arc::new(Ctx {
+                client,
+                label_name,
+                provider_id_value: ProviderIDPart::Last,
+            }),
         )
         .for_each(|res| async move {
             match res {
