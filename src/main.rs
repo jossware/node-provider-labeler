@@ -1,6 +1,7 @@
 mod provider_id;
 
 use crate::provider_id::ProviderID;
+use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
@@ -17,6 +18,7 @@ use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
 const MANAGER: &str = "node-provider-labeler";
+const DEFAULT_LABEL_NAME: &str = "provider-id";
 
 #[derive(Error, Debug)]
 enum Error {
@@ -34,6 +36,14 @@ enum ProviderIDPart {
     Last,
     First,
     Nth(usize),
+}
+
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    /// The label to set
+    #[arg(short, long)]
+    label: Option<String>,
 }
 
 impl FromStr for ProviderIDPart {
@@ -130,9 +140,10 @@ async fn main() -> color_eyre::Result<()> {
     tracing_subscriber::fmt::init();
 
     info!("starting");
+    let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
-    let label_name = "provider-id".to_string();
+    let label_name = args.label.unwrap_or_else(|| DEFAULT_LABEL_NAME.to_string());
 
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
