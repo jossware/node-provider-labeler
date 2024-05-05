@@ -28,6 +28,8 @@ enum Error {
     MissingObjectKey(&'static str),
     #[error("ProviderIDError: {0}")]
     ProviderID(#[from] ProviderIDError),
+    #[error("ParseIntError: {0}")]
+    ParseInt(#[from] std::num::ParseIntError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -44,10 +46,13 @@ struct Args {
     /// The label to set
     #[arg(short, long)]
     label: Option<String>,
+    /// The provider id part to use
+    #[arg(short, long)]
+    provider_part: Option<String>,
 }
 
 impl FromStr for ProviderIDPart {
-    type Err = ();
+    type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
@@ -55,7 +60,7 @@ impl FromStr for ProviderIDPart {
             "last" => Ok(Self::Last),
             "first" => Ok(Self::First),
             _ => {
-                let idx = s.parse::<usize>().map_err(|_| ())?;
+                let idx = s.parse::<usize>().map_err(Error::ParseInt)?;
                 Ok(Self::Nth(idx))
             }
         }
@@ -103,7 +108,8 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
                     provider_id.node_id()
                 }
             }
-        };
+        }
+        .replace('/', "_");
 
         let mut labels = node.metadata.labels.clone().unwrap_or_default();
         labels.insert(ctx.label_name.clone(), value.to_string());
@@ -144,6 +150,10 @@ async fn main() -> color_eyre::Result<()> {
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
     let label_name = args.label.unwrap_or_else(|| DEFAULT_LABEL_NAME.to_string());
+    let provider_id_value: ProviderIDPart = args
+        .provider_part
+        .unwrap_or_else(|| "last".to_string())
+        .parse()?;
 
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
@@ -154,7 +164,7 @@ async fn main() -> color_eyre::Result<()> {
             Arc::new(Ctx {
                 client,
                 label_name,
-                provider_id_value: ProviderIDPart::Last,
+                provider_id_value,
             }),
         )
         .for_each(|res| async move {
@@ -207,19 +217,12 @@ mod tests {
             assert_eq!(p, expected);
         }
 
-        let invalid = [
-            ("huh", ()),
-            ("", ()),
-            (" ", ()),
-            ("-", ()),
-            ("fsdfds", ()),
-            ("akljsf dajdk  sjdf", ()),
-        ];
+        let invalid = ["huh", "", " ", "-", "fsdfds", "akljsf dajdk  sjdf"];
         for test in invalid {
-            let (input, expected) = test;
-            let p = ProviderIDPart::from_str(input);
+            let p = ProviderIDPart::from_str(test);
             assert!(p.is_err());
-            assert_eq!(Err(expected), p);
+            let e = p.unwrap_err();
+            assert!(matches!(Some(e), Some(Error::ParseInt(_))));
         }
     }
 }
