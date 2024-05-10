@@ -1,4 +1,5 @@
 mod provider_id;
+mod template;
 
 use crate::provider_id::ProviderID;
 use clap::Parser;
@@ -30,6 +31,8 @@ enum Error {
     ProviderID(#[from] ProviderIDError),
     #[error("ParseIntError: {0}")]
     ParseInt(#[from] std::num::ParseIntError),
+    #[error("TemplateParseError: {0}")]
+    TemplateParser(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -38,6 +41,7 @@ enum ProviderIDPart {
     Last,
     First,
     Nth(usize),
+    Template(&'static str),
 }
 
 #[derive(Parser, Debug)]
@@ -49,6 +53,8 @@ struct Args {
     /// The provider id part to use
     #[arg(short, long)]
     provider_part: Option<String>,
+    #[arg(long)]
+    annotation: bool,
 }
 
 impl FromStr for ProviderIDPart {
@@ -59,6 +65,7 @@ impl FromStr for ProviderIDPart {
             "all" => Ok(Self::All),
             "last" => Ok(Self::Last),
             "first" => Ok(Self::First),
+            "template" => Ok(Self::Template("{:last}")),
             _ => {
                 let idx = s.parse::<usize>().map_err(Error::ParseInt)?;
                 Ok(Self::Nth(idx))
@@ -71,6 +78,7 @@ struct Ctx {
     client: Client,
     label_name: String,
     provider_id_value: ProviderIDPart,
+    annotation: bool,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
@@ -106,6 +114,13 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
                 } else {
                     warn!({ node = node_name, index = i }, "nth index out of bounds");
                     provider_id.node_id()
+                }
+            }
+            ProviderIDPart::Template(t) => {
+                if ctx.annotation {
+                    template::annotation(t, &provider_id)?
+                } else {
+                    template::label(t, &provider_id)?
                 }
             }
         }
@@ -154,6 +169,7 @@ async fn main() -> color_eyre::Result<()> {
         .provider_part
         .unwrap_or_else(|| "last".to_string())
         .parse()?;
+    let annotation = args.annotation;
 
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
@@ -165,6 +181,7 @@ async fn main() -> color_eyre::Result<()> {
                 client,
                 label_name,
                 provider_id_value,
+                annotation,
             }),
         )
         .for_each(|res| async move {

@@ -27,6 +27,7 @@
           ];
           buildInputs = with pkgs; [
             kubectl
+            pest-ide-tools
             rust-bin.stable.latest.default
             rust-analyzer
           ];

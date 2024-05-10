@@ -40,23 +40,24 @@ impl ProviderID {
         Ok(pid)
     }
 
-    pub fn provider(&self) -> &str {
-        &self.provider
+    pub fn provider(&self) -> String {
+        self.provider.to_string()
     }
 
-    pub fn node_id(&self) -> &str {
-        &self.node_id
+    pub fn node_id(&self) -> String {
+        self.node_id.to_string()
     }
 
-    pub fn last(&self) -> &str {
+    pub fn last(&self) -> String {
         self.id_parts
             .last()
             .map(String::as_str)
-            .unwrap_or(self.node_id())
+            .unwrap_or(&self.node_id())
+            .to_string()
     }
 
-    pub fn nth(&self, n: usize) -> Option<&str> {
-        self.id_parts.get(n).map(String::as_str)
+    pub fn nth(&self, n: usize) -> Option<String> {
+        self.id_parts.get(n).map(String::to_string)
     }
 }
 
@@ -177,9 +178,12 @@ mod tests {
         let provider_id = "kind://podman/kind-cluster/kind-cluster-control-plane";
         let provider_id = ProviderID::new(provider_id).unwrap();
 
-        assert_eq!(provider_id.nth(0), Some("podman"));
-        assert_eq!(provider_id.nth(1), Some("kind-cluster"));
-        assert_eq!(provider_id.nth(2), Some("kind-cluster-control-plane"));
+        assert_eq!(provider_id.nth(0), Some("podman".to_string()));
+        assert_eq!(provider_id.nth(1), Some("kind-cluster".to_string()));
+        assert_eq!(
+            provider_id.nth(2),
+            Some("kind-cluster-control-plane".to_string())
+        );
         assert_eq!(provider_id.nth(3), None);
     }
 }

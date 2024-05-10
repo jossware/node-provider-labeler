@@ -13,3 +13,5 @@ tracing-subscriber = "0.3.18"
 thiserror = "1.0.59"
 futures = "0.3.30"
 clap = { version = "4.5.4", features = ["derive"] }
+pest = "2.7.10"
+pest_derive = "2.7.10"
