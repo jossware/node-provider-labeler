@@ -14,7 +14,7 @@ use kube::{
     Api, Client, ResourceExt,
 };
 use provider_id::ProviderIDError;
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
@@ -44,14 +44,17 @@ struct Args {
     #[arg(short, long)]
     template: Option<String>,
     #[arg(long)]
-    annotation: bool,
+    annotation: Option<String>,
+    #[arg(long)]
+    annotation_template: Option<String>,
 }
 
 struct Ctx {
     client: Client,
-    label_name: String,
+    label: Option<String>,
     template: String,
-    annotation: bool,
+    annotation: Option<String>,
+    annotation_template: String,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
@@ -77,17 +80,35 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         // .spec.providerID is immutable except from "" to valid
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
 
-        let value = if ctx.annotation {
-            template::annotation(&ctx.template, &provider_id)?
-        } else {
-            template::label(&ctx.template, &provider_id)?.replace('/', "_")
-        };
+        let mut labels = node.metadata.labels.clone();
+        if let Some(label_name) = &ctx.label {
+            if label_name.is_empty() {
+                warn!("label name is empty");
+                return Ok(Action::requeue(Duration::from_secs(300)));
+            }
+            let value = template::label(&ctx.template, &provider_id)?;
+            labels
+                .as_mut()
+                .unwrap_or(&mut BTreeMap::new())
+                .insert(label_name.clone(), value.to_string());
+        }
 
-        let mut labels = node.metadata.labels.clone().unwrap_or_default();
-        labels.insert(ctx.label_name.clone(), value.to_string());
+        let mut annotations = node.metadata.annotations.clone();
+        if let Some(annotation_name) = &ctx.annotation {
+            if annotation_name.is_empty() {
+                warn!("annotation name is empty");
+                return Ok(Action::requeue(Duration::from_secs(300)));
+            }
+            let value = template::annotation(&ctx.annotation_template, &provider_id)?;
+            annotations
+                .as_mut()
+                .unwrap_or(&mut BTreeMap::new())
+                .insert(annotation_name.clone(), value.to_string());
+        }
 
         let patch = ObjectMeta {
-            labels: Some(labels),
+            labels,
+            annotations,
             ..Default::default()
         }
         .into_request_partial::<Node>();
@@ -121,9 +142,16 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
-    let label_name = args.label.unwrap_or_else(|| DEFAULT_LABEL_NAME.to_string());
+    let mut label = args.label;
     let template = args.template.unwrap_or_else(|| "{:last}".to_string());
     let annotation = args.annotation;
+    let annotation_template = args
+        .annotation_template
+        .unwrap_or_else(|| "{:last}".to_string());
+
+    if annotation.is_none() && label.is_none() {
+        label = Some(DEFAULT_LABEL_NAME.to_string());
+    }
 
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
@@ -133,9 +161,10 @@ async fn main() -> color_eyre::Result<()> {
             error_policy,
             Arc::new(Ctx {
                 client,
-                label_name,
+                label,
                 template,
                 annotation,
+                annotation_template,
             }),
         )
         .for_each(|res| async move {
