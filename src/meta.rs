@@ -12,7 +12,7 @@ impl FromStr for Name {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Err(e) = Self::validate(s) {
-            return Err(eyre::eyre!("invalid label name ({})", e.to_string()));
+            return Err(eyre::eyre!("invalid name ({})", e.to_string()));
         }
         Ok(Self(s.to_string()))
     }
@@ -65,7 +65,7 @@ impl FromStr for Prefix {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if let Err(e) = Self::validate(s) {
-            return Err(eyre::eyre!("invalid label prefix ({})", e.to_string()));
+            return Err(eyre::eyre!("invalid prefix ({})", e.to_string()));
         }
         Ok(Self(s.to_string()))
     }
@@ -89,10 +89,10 @@ impl Prefix {
             // check label length
             let len = label.len();
             if len < 1 {
-                return Err(eyre::eyre!("label < 1 character"));
+                return Err(eyre::eyre!("dns label < 1 character"));
             }
             if len > 63 {
-                return Err(eyre::eyre!("label > 63 characters"));
+                return Err(eyre::eyre!("dns label > 63 characters"));
             }
 
             // check label characters
@@ -113,7 +113,7 @@ impl Prefix {
                     .map_or(false, |c| c.is_ascii_alphanumeric())
             {
                 return Err(eyre::eyre!(
-                    "label must start and end with an alphanumeric character"
+                    "must start and end with an alphanumeric character"
                 ));
             }
         }
@@ -138,7 +138,7 @@ impl FromStr for MetadataKey {
         let (prefix, name) = match parts.len() {
             1 => (None, parts[0].parse()?),
             2 => (Some(parts[0].parse()?), parts[1].parse()?),
-            _ => return Err(eyre::eyre!("invalid label key")),
+            _ => return Err(eyre::eyre!("invalid key")),
         };
 
         Ok(Self { key, prefix, name })
