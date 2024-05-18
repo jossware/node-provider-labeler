@@ -44,12 +44,18 @@ struct Args {
     /// The label to set
     #[arg(short, long)]
     label: Option<String>,
-    #[arg(short, long)]
-    template: Option<String>,
+    /// The template to use for the label value
+    #[arg(short, long, default_value = DEFAULT_TEMPLATE)]
+    template: String,
+    /// The annotation to set
     #[arg(long)]
     annotation: Option<String>,
-    #[arg(long)]
-    annotation_template: Option<String>,
+    /// The template to use for the annotation value
+    #[arg(long, default_value = DEFAULT_TEMPLATE)]
+    annotation_template: String,
+    /// Requeue reconciliation of a node after this duration in seconds
+    #[arg(long, default_value_t = 300)]
+    requeue_duration: u64,
 }
 
 struct Ctx {
@@ -58,6 +64,7 @@ struct Ctx {
     template: String,
     annotation: Option<Annotation>,
     annotation_template: String,
+    requeue_duration: u64,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
@@ -120,7 +127,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         warn!({ node = node_name }, "no provider id found");
     }
 
-    Ok(Action::requeue(Duration::from_secs(300)))
+    Ok(Action::requeue(Duration::from_secs(ctx.requeue_duration)))
 }
 
 fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
@@ -144,19 +151,16 @@ async fn run_controller() -> color_eyre::Result<()> {
     let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
+    let requeue_duration = args.requeue_duration;
 
     let mut label = args.label.map(|s| s.parse::<Label>()).transpose()?;
-    let template = args
-        .template
-        .unwrap_or_else(|| DEFAULT_TEMPLATE.to_string());
+    let template = args.template;
 
     let annotation = args
         .annotation
         .map(|s| s.parse::<Annotation>())
         .transpose()?;
-    let annotation_template = args
-        .annotation_template
-        .unwrap_or_else(|| DEFAULT_TEMPLATE.to_string());
+    let annotation_template = args.annotation_template;
 
     // if neither label or annotation is configured, use a default label
     if annotation.is_none() && label.is_none() {
@@ -175,6 +179,7 @@ async fn run_controller() -> color_eyre::Result<()> {
                 template,
                 annotation,
                 annotation_template,
+                requeue_duration,
             }),
         )
         .for_each(|res| async move {
