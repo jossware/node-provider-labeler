@@ -1,3 +1,4 @@
+mod meta;
 mod provider_id;
 mod template;
 
@@ -13,6 +14,7 @@ use kube::{
     },
     Api, Client, ResourceExt,
 };
+use meta::{Annotation, Label};
 use provider_id::ProviderIDError;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use thiserror::Error;
@@ -20,6 +22,7 @@ use tracing::{debug, error, info, warn};
 
 const MANAGER: &str = "node-provider-labeler";
 const DEFAULT_LABEL_NAME: &str = "provider-id";
+const DEFAULT_TEMPLATE: &str = "{:last}";
 
 #[derive(Error, Debug)]
 enum Error {
@@ -51,9 +54,9 @@ struct Args {
 
 struct Ctx {
     client: Client,
-    label: Option<String>,
+    label: Option<Label>,
     template: String,
-    annotation: Option<String>,
+    annotation: Option<Annotation>,
     annotation_template: String,
 }
 
@@ -82,28 +85,20 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
 
         let mut labels = node.metadata.labels.clone();
         if let Some(label_name) = &ctx.label {
-            if label_name.is_empty() {
-                warn!("label name is empty");
-                return Ok(Action::requeue(Duration::from_secs(300)));
-            }
             let value = template::label(&ctx.template, &provider_id)?;
             labels
                 .as_mut()
                 .unwrap_or(&mut BTreeMap::new())
-                .insert(label_name.clone(), value.to_string());
+                .insert(label_name.to_string(), value.to_string());
         }
 
         let mut annotations = node.metadata.annotations.clone();
         if let Some(annotation_name) = &ctx.annotation {
-            if annotation_name.is_empty() {
-                warn!("annotation name is empty");
-                return Ok(Action::requeue(Duration::from_secs(300)));
-            }
             let value = template::annotation(&ctx.annotation_template, &provider_id)?;
             annotations
                 .as_mut()
                 .unwrap_or(&mut BTreeMap::new())
-                .insert(annotation_name.clone(), value.to_string());
+                .insert(annotation_name.to_string(), value.to_string());
         }
 
         let patch = ObjectMeta {
@@ -142,15 +137,23 @@ async fn main() -> color_eyre::Result<()> {
     let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
-    let mut label = args.label;
-    let template = args.template.unwrap_or_else(|| "{:last}".to_string());
-    let annotation = args.annotation;
+
+    let mut label = args.label.map(|s| s.parse::<Label>()).transpose()?;
+    let template = args
+        .template
+        .unwrap_or_else(|| DEFAULT_TEMPLATE.to_string());
+
+    let annotation = args
+        .annotation
+        .map(|s| s.parse::<Annotation>())
+        .transpose()?;
     let annotation_template = args
         .annotation_template
-        .unwrap_or_else(|| "{:last}".to_string());
+        .unwrap_or_else(|| DEFAULT_TEMPLATE.to_string());
 
+    // if neither label or annotation is configured, use a default label
     if annotation.is_none() && label.is_none() {
-        label = Some(DEFAULT_LABEL_NAME.to_string());
+        label = Some(DEFAULT_LABEL_NAME.parse::<Label>()?);
     }
 
     Controller::new(node, watcher::Config::default())
