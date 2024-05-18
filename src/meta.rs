@@ -153,3 +153,268 @@ impl std::fmt::Display for MetadataKey {
 
 pub type Label = MetadataKey;
 pub type Annotation = MetadataKey;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn meta_name_fromstr() {
+        struct TestCase<'a> {
+            input: &'a str,
+            output: Option<Name>,
+            error: Option<&'a str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                input: "test",
+                output: Some(Name("test".into())),
+                error: None,
+            },
+            TestCase {
+                input: "x--------------------------------------------------------------x",
+                output: None,
+                error: Some("invalid name (> 63 characters)"),
+            },
+            TestCase {
+                input: "-test",
+                output: None,
+                error: Some("invalid name (must start and end with an alphanumeric character)"),
+            },
+            TestCase {
+                input: "test-",
+                output: None,
+                error: Some("invalid name (must start and end with an alphanumeric character)"),
+            },
+            TestCase {
+                input: "te~t",
+                output: None,
+                error: Some("invalid name (invalid character '~')"),
+            },
+        ];
+
+        for case in cases {
+            let result = case.input.parse::<Name>();
+
+            if let Err(err) = result {
+                assert_eq!(
+                    case.error.expect("error occurred but expected None"),
+                    err.to_string(),
+                );
+            } else {
+                let expected = case.output;
+
+                assert!(
+                    expected.is_some(),
+                    "success but output is None. input: {}",
+                    case.input
+                );
+
+                let expected = expected.unwrap();
+                let actual = result.unwrap();
+                assert_eq!(expected, actual);
+            }
+        }
+    }
+
+    #[test]
+    fn meta_prefix_fromstr() {
+        struct TestCase<'a> {
+            input: &'a str,
+            output: Option<Prefix>,
+            error: Option<&'a str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                input: "test",
+                output: Some(Prefix("test".into())),
+                error: None,
+            },
+            TestCase {
+                input: "x----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------x",
+                output: None,
+                error: Some("invalid prefix (> 253 characters)"),
+            },
+            TestCase {
+                input: "test.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.test",
+                output: None,
+                error: Some("invalid prefix (dns label > 63 characters)"),
+            },
+            TestCase {
+                input: "",
+                output: None,
+                error: Some("invalid prefix (dns label < 1 character)"),
+            },
+            TestCase {
+                input: "-test",
+                output: None,
+                error: Some(
+                    "invalid prefix (must start and end with an alphanumeric character)",
+                ),
+            },
+            TestCase {
+                input: "test-",
+                output: None,
+                error: Some(
+                    "invalid prefix (must start and end with an alphanumeric character)",
+                ),
+            },
+            TestCase {
+                input: "te~t",
+                output: None,
+                error: Some("invalid prefix (invalid character '~')"),
+            },
+            TestCase {
+                input: "test.test",
+                output: Some(Prefix("test.test".into())),
+                error: None,
+            },
+            TestCase {
+                input: "test.test.test",
+                output: Some(Prefix("test.test.test".into())),
+                error: None,
+            },
+        ];
+
+        for case in cases {
+            let result = case.input.parse::<Prefix>();
+
+            if let Err(err) = result {
+                assert_eq!(
+                    case.error.expect("error occurred but expected None"),
+                    err.to_string(),
+                );
+            } else {
+                let expected = case.output;
+
+                assert!(
+                    expected.is_some(),
+                    "success but output is None. input: {}",
+                    case.input
+                );
+
+                let expected = expected.unwrap();
+                let actual = result.unwrap();
+                assert_eq!(expected, actual);
+            }
+        }
+    }
+
+    #[test]
+    fn metadata_key_fromstr() {
+        struct TestCase<'a> {
+            input: &'a str,
+            output: Option<MetadataKey>,
+            error: Option<&'a str>,
+        }
+
+        let cases = vec![
+            TestCase {
+                input: "app",
+                output: Some(MetadataKey {
+                    key: "app".into(),
+                    name: "app".parse().unwrap(),
+                    prefix: None,
+                }),
+                error: None,
+            },
+            TestCase {
+                input: "app=test=test2",
+                output: None,
+                error: Some("invalid name (invalid character '=')"),
+            },
+            TestCase {
+                input: "domain.com/app/v1",
+                output: None,
+                error: Some("invalid key"),
+            },
+            TestCase {
+                input: "domain.com/app",
+                output: Some(MetadataKey {
+                    key: "domain.com/app".into(),
+                    name: "app".parse().unwrap(),
+                    prefix: Some("domain.com".parse().unwrap()),
+                }),
+                error: None,
+            },
+            TestCase {
+                input: "x.------------------------------------------------------------.x=test2",
+                output: None,
+                error: Some("invalid name (> 63 characters)"),
+            },
+            TestCase {
+                input: "-app",
+                output: None,
+                error: Some(
+                    "invalid name (must start and end with an alphanumeric character)",
+                ),
+            },
+            TestCase {
+                input: "app~1",
+                output: None,
+                error: Some("invalid name (invalid character '~')"),
+            },
+            TestCase {
+                input: "domai~n.com/app=test2",
+                output: None,
+                error: Some("invalid prefix (invalid character '~')"),
+            },
+            TestCase {
+                input: "domain.x--------------------------------------------------------------x.com/app",
+                output: None,
+                error: Some("invalid prefix (dns label > 63 characters)"),
+            },
+            TestCase {
+                input: "domain..com/app",
+                output: None,
+                error: Some("invalid prefix (dns label < 1 character)"),
+            },
+            TestCase {
+                input: "domain.-x.com/app",
+                output: None,
+                error: Some("invalid prefix (must start and end with an alphanumeric character)"),
+            },
+            TestCase {
+                input: "domain.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.com/app=test2",
+                output: None,
+                error: Some("invalid prefix (> 253 characters)"),
+            },
+            TestCase {
+                input: "sub.domain.com/app",
+                output: Some(MetadataKey{
+                    prefix: Some("sub.domain.com".parse().unwrap()),
+                    name: "app".parse().unwrap(),
+                    key: "sub.domain.com/app".into(),
+                }),
+                error: None,
+            },
+        ];
+
+        for case in cases {
+            let result = case.input.parse::<MetadataKey>();
+
+            if let Err(err) = result {
+                assert_eq!(
+                    case.error.expect("error occurred but expected None"),
+                    err.to_string(),
+                );
+            } else {
+                let expected = case.output;
+
+                assert!(
+                    expected.is_some(),
+                    "success but output is None. input: {}",
+                    case.input
+                );
+
+                let expected = expected.unwrap();
+                let actual = result.unwrap();
+                assert_eq!(expected.key, actual.key);
+                assert_eq!(expected.prefix, actual.prefix);
+                assert_eq!(expected.name, actual.name);
+            }
+        }
+    }
+}
