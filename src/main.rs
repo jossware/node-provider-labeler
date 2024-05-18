@@ -16,7 +16,7 @@ use kube::{
 };
 use meta::{Annotation, Label};
 use provider_id::ProviderIDError;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, process::ExitCode, sync::Arc, time::Duration};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
@@ -130,9 +130,16 @@ fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
 }
 
 #[tokio::main]
-async fn main() -> color_eyre::Result<()> {
+async fn main() -> ExitCode {
     tracing_subscriber::fmt::init();
+    if let Err(e) = run_controller().await {
+        error!({ error = e.to_string() }, "unable to run controller");
+        return ExitCode::FAILURE;
+    }
+    ExitCode::SUCCESS
+}
 
+async fn run_controller() -> color_eyre::Result<()> {
     info!("starting");
     let args = Args::parse();
     let client = Client::try_default().await?;
