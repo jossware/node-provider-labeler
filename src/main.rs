@@ -41,7 +41,7 @@ enum Error {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// The label to set
+    /// The label to set. The default label is "provider-id" if no other label or annotation is configured
     #[arg(short, long)]
     label: Option<String>,
     /// The template to use for the label value
