@@ -143,38 +143,18 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         let provider_id = ProviderID::new(provider_id)?;
         info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
 
-        // .spec.providerID is immutable except from "" to valid
-        // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
+        let mut payload = ObjectMeta::default();
 
-        let mut labels = node.metadata.labels.clone();
         if let Some(renderers) = &ctx.labels {
-            for renderer in renderers.iter() {
-                let value = renderer.template.render(&provider_id)?;
-                labels
-                    .as_mut()
-                    .unwrap_or(&mut BTreeMap::new())
-                    .insert(renderer.key.to_string(), value.to_string());
-            }
+            payload.labels = Some(render(renderers, &provider_id)?);
         }
 
-        let mut annotations = node.metadata.annotations.clone();
         if let Some(renderers) = &ctx.annotations {
-            for renderer in renderers.iter() {
-                let value = renderer.template.render(&provider_id)?;
-                annotations
-                    .as_mut()
-                    .unwrap_or(&mut BTreeMap::new())
-                    .insert(renderer.key.to_string(), value.to_string());
-            }
+            payload.annotations = Some(render(renderers, &provider_id)?);
         }
 
-        let patch = ObjectMeta {
-            labels,
-            annotations,
-            ..Default::default()
-        }
-        .into_request_partial::<Node>();
-
+        debug!({ node = node_name }, "patching {:?}", payload);
+        let patch = payload.into_request_partial::<Node>();
         let node_api: Api<Node> = Api::all(ctx.client.clone());
         node_api
             .patch_metadata(
@@ -250,6 +230,23 @@ async fn run_controller() -> color_eyre::Result<()> {
     info!("stopping");
 
     Ok(())
+}
+
+fn render<T>(
+    renderers: &[Renderer<T>],
+    provider_id: &ProviderID,
+) -> Result<BTreeMap<String, String>, Error>
+where
+    T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
+    Error: std::convert::From<<T as std::str::FromStr>::Err>,
+{
+    let mut fields = BTreeMap::new();
+    for renderer in renderers.iter() {
+        let key = renderer.key.to_string();
+        let value = renderer.template.render(provider_id)?;
+        fields.insert(key, value);
+    }
+    Ok(fields)
 }
 
 fn parse_renderers<T>(args: Option<Vec<String>>) -> Option<Vec<Renderer<T>>>
