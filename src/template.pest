@@ -7,11 +7,11 @@ char = { ASCII_ALPHANUMERIC | "." | "_" | "-" | "/" | " " }
 label_char = { ASCII_ALPHA | ASCII_DIGIT | "-" | "_" | "."}
 annotation = {
     SOI ~
-    ((last | first | all | nth)+ ~ char*)+ ~
+    ((last | first | all | nth | char)+)+ ~
     EOI
 }
 label = {
     SOI ~
-    ((last | first | all | nth)+ ~ label_char*)+ ~
+    ((last | first | all | nth | label_char)+)+ ~
     EOI
 }

@@ -1,4 +1,5 @@
 #[allow(unused_imports)]
+use crate::meta::Label;
 use crate::{provider_id::ProviderID, Error};
 use pest::Parser;
 use pest_derive::Parser;
@@ -7,16 +8,36 @@ use pest_derive::Parser;
 #[grammar = "template.pest"]
 struct TemplateParser;
 
-pub fn label(template: &str, provider_id: &ProviderID) -> Result<String, Error> {
-    do_render(template, provider_id, Rule::label).map(|s| {
-        let mut s = s.replace('/', "_");
-        s.truncate(63);
-        s
-    })
+pub trait Template {
+    fn render(&self, provider_id: &ProviderID) -> Result<String, Error>;
+}
+
+#[derive(Debug)]
+pub(crate) struct LabelTemplate(String);
+
+impl LabelTemplate {
+    pub fn new(template: &str) -> Result<Self, Error> {
+        validate_template(template, Rule::label)?;
+        Ok(Self(template.to_string()))
+    }
+
+    pub fn render(&self, provider_id: &ProviderID) -> Result<String, Error> {
+        do_render(&self.0, provider_id, Rule::label).map(|s| {
+            let mut s = s.replace('/', "_");
+            s.truncate(63);
+            s
+        })
+    }
 }
 
 pub fn annotation(template: &str, provider_id: &ProviderID) -> Result<String, Error> {
     do_render(template, provider_id, Rule::annotation)
+}
+
+fn validate_template(template: &str, rule: Rule) -> Result<(), Error> {
+    TemplateParser::parse(rule, template)
+        .map(|_| ())
+        .map_err(|e| Error::TemplateParser(e.to_string()))
 }
 
 fn do_render(template: &str, provider_id: &ProviderID, rule: Rule) -> Result<String, Error> {
@@ -56,25 +77,48 @@ mod tests {
     use crate::provider_id::ProviderID;
 
     #[test]
-    fn test_label_template_parser() {
+    fn test_label_template_from_str() {
+        let t = |template: &str| LabelTemplate::new(template).expect(template);
+
+        let _ = t("aws-{:last}");
+        let _ = t("{:last}");
+        let _ = t("{:first}");
+        let _ = t("{:all}");
+        let _ = t("{0}");
+        let _ = t("{1}");
+        let _ = t("{:last}-{:first}_{:all}.{:last}");
+
+        assert!(LabelTemplate::new("{:incorrect}").is_err());
+        assert!(LabelTemplate::new("n0tall/ow#D").is_err());
+    }
+
+    #[test]
+    fn test_label_template_render() {
+        let t = |template: &str, id: &ProviderID| {
+            LabelTemplate::new(template).unwrap().render(id).unwrap()
+        };
+
         let id = ProviderID::new("aws://us-east-2/i-1234567890abcdef0").unwrap();
 
-        let output = label("{:last}", &id).unwrap();
+        let output = t("aws-{:last}", &id);
+        assert_eq!(output, "aws-i-1234567890abcdef0");
+
+        let output = t("{:last}", &id);
         assert_eq!(output, "i-1234567890abcdef0");
 
-        let output = label("{:first}", &id).unwrap();
+        let output = t("{:first}", &id);
         assert_eq!(output, "us-east-2");
 
-        let output = label("{:all}", &id).unwrap();
+        let output = t("{:all}", &id);
         assert_eq!(output, "us-east-2_i-1234567890abcdef0");
 
-        let output = label("{0}", &id).unwrap();
+        let output = t("{0}", &id);
         assert_eq!(output, "us-east-2");
 
-        let output = label("{1}", &id).unwrap();
+        let output = t("{1}", &id);
         assert_eq!(output, "i-1234567890abcdef0");
 
-        let output = label("{:last}-{:first}_{:all}.{:last}", &id).unwrap();
+        let output = t("{:last}-{:first}_{:all}.{:last}", &id);
         assert_eq!(
             output,
             "i-1234567890abcdef0-us-east-2_us-east-2_i-1234567890abcdef0.i-1",

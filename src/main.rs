@@ -14,14 +14,15 @@ use kube::{
     },
     Api, Client, ResourceExt,
 };
-use meta::{Annotation, Label};
+use meta::{Annotation, Label, MetadataKey};
 use provider_id::ProviderIDError;
-use std::{collections::BTreeMap, process::ExitCode, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, process::ExitCode, str::FromStr, sync::Arc, time::Duration};
+use template::LabelTemplate;
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
 const MANAGER: &str = "node-provider-labeler";
-const DEFAULT_LABEL_NAME: &str = "provider-id";
+const DEFAULT_KEY_NAME: &str = "provider-id";
 const DEFAULT_TEMPLATE: &str = "{:last}";
 
 #[derive(Error, Debug)]
@@ -36,6 +37,8 @@ enum Error {
     ParseInt(#[from] std::num::ParseIntError),
     #[error("TemplateParseError: {0}")]
     TemplateParser(String),
+    #[error("MetadataKeyError: {0}")]
+    MetadataKey(String),
 }
 
 #[derive(Parser, Debug)]
@@ -44,9 +47,6 @@ struct Args {
     /// The label to set. The default label is "provider-id" if no other label or annotation is configured
     #[arg(short, long)]
     label: Option<String>,
-    /// The template to use for the label value
-    #[arg(short, long, default_value = DEFAULT_TEMPLATE)]
-    template: String,
     /// The annotation to set
     #[arg(long)]
     annotation: Option<String>,
@@ -58,10 +58,46 @@ struct Args {
     requeue_duration: u64,
 }
 
+#[derive(Debug)]
+struct Labeler {
+    key: MetadataKey,
+    template: LabelTemplate,
+}
+
+impl Default for Labeler {
+    fn default() -> Self {
+        Self {
+            key: DEFAULT_KEY_NAME.parse::<Label>().unwrap(),
+            template: LabelTemplate::new(DEFAULT_TEMPLATE).unwrap(),
+        }
+    }
+}
+
+impl FromStr for Labeler {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() {
+            return Ok(Self::default());
+        }
+        let parts = s.splitn(2, '=').collect::<Vec<&str>>();
+        let key = parts[0]
+            .parse::<MetadataKey>()
+            .map_err(|e| Error::MetadataKey(e.to_string()))?;
+        let template = if parts.len() > 1 {
+            parts[1]
+        } else {
+            DEFAULT_TEMPLATE
+        };
+        let template = LabelTemplate::new(template)?;
+
+        Ok(Self { key, template })
+    }
+}
+
 struct Ctx {
     client: Client,
-    label: Option<Label>,
-    template: String,
+    label: Option<Labeler>,
     annotation: Option<Annotation>,
     annotation_template: String,
     requeue_duration: u64,
@@ -91,12 +127,12 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
 
         let mut labels = node.metadata.labels.clone();
-        if let Some(label_name) = &ctx.label {
-            let value = template::label(&ctx.template, &provider_id)?;
+        if let Some(labeler) = &ctx.label {
+            let value = labeler.template.render(&provider_id)?;
             labels
                 .as_mut()
                 .unwrap_or(&mut BTreeMap::new())
-                .insert(label_name.to_string(), value.to_string());
+                .insert(labeler.key.to_string(), value.to_string());
         }
 
         let mut annotations = node.metadata.annotations.clone();
@@ -153,8 +189,7 @@ async fn run_controller() -> color_eyre::Result<()> {
     let node: Api<Node> = Api::all(client.clone());
     let requeue_duration = args.requeue_duration;
 
-    let mut label = args.label.map(|s| s.parse::<Label>()).transpose()?;
-    let template = args.template;
+    let mut label = args.label.map(|s| s.parse::<Labeler>()).transpose()?;
 
     let annotation = args
         .annotation
@@ -164,7 +199,7 @@ async fn run_controller() -> color_eyre::Result<()> {
 
     // if neither label or annotation is configured, use a default label
     if annotation.is_none() && label.is_none() {
-        label = Some(DEFAULT_LABEL_NAME.parse::<Label>()?);
+        label = Some(Labeler::default());
     }
 
     Controller::new(node, watcher::Config::default())
@@ -176,7 +211,6 @@ async fn run_controller() -> color_eyre::Result<()> {
             Arc::new(Ctx {
                 client,
                 label,
-                template,
                 annotation,
                 annotation_template,
                 requeue_duration,
