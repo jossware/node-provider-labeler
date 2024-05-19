@@ -1,8 +1,8 @@
 #[allow(unused_imports)]
-use crate::meta::Label;
 use crate::{provider_id::ProviderID, Error};
 use pest::Parser;
 use pest_derive::Parser;
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[grammar = "template.pest"]
@@ -12,16 +12,20 @@ pub trait Template {
     fn render(&self, provider_id: &ProviderID) -> Result<String, Error>;
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub(crate) struct LabelTemplate(String);
 
-impl LabelTemplate {
-    pub fn new(template: &str) -> Result<Self, Error> {
-        validate_template(template, Rule::label)?;
-        Ok(Self(template.to_string()))
-    }
+impl FromStr for LabelTemplate {
+    type Err = Error;
 
-    pub fn render(&self, provider_id: &ProviderID) -> Result<String, Error> {
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        validate_template(s, Rule::label)?;
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl Template for LabelTemplate {
+    fn render(&self, provider_id: &ProviderID) -> Result<String, Error> {
         do_render(&self.0, provider_id, Rule::label).map(|s| {
             let mut s = s.replace('/', "_");
             s.truncate(63);
@@ -30,8 +34,22 @@ impl LabelTemplate {
     }
 }
 
-pub fn annotation(template: &str, provider_id: &ProviderID) -> Result<String, Error> {
-    do_render(template, provider_id, Rule::annotation)
+#[derive(Default, Debug)]
+pub(crate) struct AnnotationTemplate(String);
+
+impl FromStr for AnnotationTemplate {
+    type Err = Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        validate_template(s, Rule::annotation)?;
+        Ok(Self(s.to_string()))
+    }
+}
+
+impl Template for AnnotationTemplate {
+    fn render(&self, provider_id: &ProviderID) -> Result<String, Error> {
+        do_render(&self.0, provider_id, Rule::annotation)
+    }
 }
 
 fn validate_template(template: &str, rule: Rule) -> Result<(), Error> {
@@ -78,7 +96,7 @@ mod tests {
 
     #[test]
     fn test_label_template_from_str() {
-        let t = |template: &str| LabelTemplate::new(template).expect(template);
+        let t = |template: &str| LabelTemplate::from_str(template).expect(template);
 
         let _ = t("aws-{:last}");
         let _ = t("{:last}");
@@ -88,14 +106,17 @@ mod tests {
         let _ = t("{1}");
         let _ = t("{:last}-{:first}_{:all}.{:last}");
 
-        assert!(LabelTemplate::new("{:incorrect}").is_err());
-        assert!(LabelTemplate::new("n0tall/ow#D").is_err());
+        assert!(LabelTemplate::from_str("{:incorrect}").is_err());
+        assert!(LabelTemplate::from_str("n0tall/ow#D").is_err());
     }
 
     #[test]
     fn test_label_template_render() {
         let t = |template: &str, id: &ProviderID| {
-            LabelTemplate::new(template).unwrap().render(id).unwrap()
+            LabelTemplate::from_str(template)
+                .unwrap()
+                .render(id)
+                .unwrap()
         };
 
         let id = ProviderID::new("aws://us-east-2/i-1234567890abcdef0").unwrap();
@@ -127,30 +148,37 @@ mod tests {
 
     #[test]
     fn test_annotation_template_parser() {
+        let a = |template: &str, id: &ProviderID| {
+            AnnotationTemplate::from_str(template)
+                .unwrap()
+                .render(id)
+                .unwrap()
+        };
+
         let id = ProviderID::new("aws://us-east-2/i-1234567890abcdef0").unwrap();
 
-        let output = annotation("{:last}", &id).unwrap();
+        let output = a("{:last}", &id);
         assert_eq!(output, "i-1234567890abcdef0");
 
-        let output = annotation("{:first}", &id).unwrap();
+        let output = a("{:first}", &id);
         assert_eq!(output, "us-east-2");
 
-        let output = annotation("{:all}", &id).unwrap();
+        let output = a("{:all}", &id);
         assert_eq!(output, "us-east-2/i-1234567890abcdef0");
 
-        let output = annotation("{0}", &id).unwrap();
+        let output = a("{0}", &id);
         assert_eq!(output, "us-east-2");
 
-        let output = annotation("{1}", &id).unwrap();
+        let output = a("{1}", &id);
         assert_eq!(output, "i-1234567890abcdef0");
 
-        let output = annotation("{:last}-{:first}_{:all}.{:last}", &id).unwrap();
+        let output = a("{:last}-{:first}_{:all}.{:last}", &id);
         assert_eq!(
             output,
             "i-1234567890abcdef0-us-east-2_us-east-2/i-1234567890abcdef0.i-1234567890abcdef0"
         );
 
-        let output = annotation("{:last}-{:first} {:all}/{:last}", &id).unwrap();
+        let output = a("{:last}-{:first} {:all}/{:last}", &id);
         assert_eq!(
             output,
             "i-1234567890abcdef0-us-east-2 us-east-2/i-1234567890abcdef0/i-1234567890abcdef0"

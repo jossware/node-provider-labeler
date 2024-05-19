@@ -151,9 +151,6 @@ impl std::fmt::Display for MetadataKey {
     }
 }
 
-pub type Label = MetadataKey;
-pub type Annotation = MetadataKey;
-
 #[cfg(test)]
 mod tests {
     use super::*;

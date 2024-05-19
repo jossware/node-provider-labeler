@@ -14,10 +14,10 @@ use kube::{
     },
     Api, Client, ResourceExt,
 };
-use meta::{Annotation, Label, MetadataKey};
+use meta::MetadataKey;
 use provider_id::ProviderIDError;
 use std::{collections::BTreeMap, process::ExitCode, str::FromStr, sync::Arc, time::Duration};
-use template::LabelTemplate;
+use template::{AnnotationTemplate, LabelTemplate, Template};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
 
@@ -41,39 +41,57 @@ enum Error {
     MetadataKey(String),
 }
 
+// TODO: update help text
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// The label to set. The default label is "provider-id" if no other label or annotation is configured
-    #[arg(short, long)]
+    /// The label key and optional template to use for the label value
+    #[arg(
+        short,
+        long,
+        long_help = "The label key and optional template to use for the label value.\nThe default is \"provider-id={:last}\" if no other labels or annotations are configured.\nExample: label-key={:last}"
+    )]
     label: Option<String>,
-    /// The annotation to set
-    #[arg(long)]
+    /// The annotation key and optional template to use for the annotation value
+    #[arg(
+        short,
+        long,
+        long_help = "The annotation key and optional template to use for the annotation value.\nIf not specified, the default template is \"{:last}\".\nExample: annotation-key={0}"
+    )]
     annotation: Option<String>,
-    /// The template to use for the annotation value
-    #[arg(long, default_value = DEFAULT_TEMPLATE)]
-    annotation_template: String,
     /// Requeue reconciliation of a node after this duration in seconds
     #[arg(long, default_value_t = 300)]
     requeue_duration: u64,
 }
 
 #[derive(Debug)]
-struct Labeler {
+struct Renderer<T>
+where
+    T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
+    Error: std::convert::From<<T as std::str::FromStr>::Err>,
+{
     key: MetadataKey,
-    template: LabelTemplate,
+    template: T,
 }
 
-impl Default for Labeler {
+impl<T> Default for Renderer<T>
+where
+    T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
+    Error: std::convert::From<<T as std::str::FromStr>::Err>,
+{
     fn default() -> Self {
         Self {
-            key: DEFAULT_KEY_NAME.parse::<Label>().unwrap(),
-            template: LabelTemplate::new(DEFAULT_TEMPLATE).unwrap(),
+            key: DEFAULT_KEY_NAME.parse::<MetadataKey>().unwrap(),
+            template: T::from_str(DEFAULT_TEMPLATE).unwrap_or_default(),
         }
     }
 }
 
-impl FromStr for Labeler {
+impl<T> FromStr for Renderer<T>
+where
+    T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
+    Error: std::convert::From<<T as std::str::FromStr>::Err>,
+{
     type Err = Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -89,7 +107,7 @@ impl FromStr for Labeler {
         } else {
             DEFAULT_TEMPLATE
         };
-        let template = LabelTemplate::new(template)?;
+        let template = T::from_str(template)?;
 
         Ok(Self { key, template })
     }
@@ -97,9 +115,8 @@ impl FromStr for Labeler {
 
 struct Ctx {
     client: Client,
-    label: Option<Labeler>,
-    annotation: Option<Annotation>,
-    annotation_template: String,
+    label: Option<Renderer<LabelTemplate>>,
+    annotation: Option<Renderer<AnnotationTemplate>>,
     requeue_duration: u64,
 }
 
@@ -127,21 +144,21 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
 
         let mut labels = node.metadata.labels.clone();
-        if let Some(labeler) = &ctx.label {
-            let value = labeler.template.render(&provider_id)?;
+        if let Some(renderer) = &ctx.label {
+            let value = renderer.template.render(&provider_id)?;
             labels
                 .as_mut()
                 .unwrap_or(&mut BTreeMap::new())
-                .insert(labeler.key.to_string(), value.to_string());
+                .insert(renderer.key.to_string(), value.to_string());
         }
 
         let mut annotations = node.metadata.annotations.clone();
-        if let Some(annotation_name) = &ctx.annotation {
-            let value = template::annotation(&ctx.annotation_template, &provider_id)?;
+        if let Some(labeler) = &ctx.annotation {
+            let value = labeler.template.render(&provider_id)?;
             annotations
                 .as_mut()
                 .unwrap_or(&mut BTreeMap::new())
-                .insert(annotation_name.to_string(), value.to_string());
+                .insert(labeler.key.to_string(), value.to_string());
         }
 
         let patch = ObjectMeta {
@@ -189,17 +206,19 @@ async fn run_controller() -> color_eyre::Result<()> {
     let node: Api<Node> = Api::all(client.clone());
     let requeue_duration = args.requeue_duration;
 
-    let mut label = args.label.map(|s| s.parse::<Labeler>()).transpose()?;
+    let mut label = args
+        .label
+        .map(|s| s.parse::<Renderer<LabelTemplate>>())
+        .transpose()?;
 
     let annotation = args
         .annotation
-        .map(|s| s.parse::<Annotation>())
+        .map(|s| s.parse::<Renderer<AnnotationTemplate>>())
         .transpose()?;
-    let annotation_template = args.annotation_template;
 
     // if neither label or annotation is configured, use a default label
     if annotation.is_none() && label.is_none() {
-        label = Some(Labeler::default());
+        label = Some(Renderer::default());
     }
 
     Controller::new(node, watcher::Config::default())
@@ -212,7 +231,6 @@ async fn run_controller() -> color_eyre::Result<()> {
                 client,
                 label,
                 annotation,
-                annotation_template,
                 requeue_duration,
             }),
         )
