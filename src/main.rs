@@ -159,7 +159,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         node_api
             .patch_metadata(
                 node_name,
-                &PatchParams::apply(MANAGER),
+                &PatchParams::apply(MANAGER).force(),
                 &Patch::Apply(&patch),
             )
             .await?;
