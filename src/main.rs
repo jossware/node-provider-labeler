@@ -220,9 +220,9 @@ async fn run_controller() -> color_eyre::Result<()> {
             match res {
                 Ok(o) => {
                     let node_name = o.0.clone().name;
-                    info!({ node = node_name }, "reconciled");
+                    debug!({ node = node_name }, "reconciled");
                 }
-                Err(e) => info!("reconcile error: {:?}", e),
+                Err(e) => error!("reconcile error: {:?}", e),
             }
         })
         .await;
