@@ -55,12 +55,13 @@ struct Args {
     #[arg(short, long, verbatim_doc_comment)]
     label: Option<Vec<String>>,
     /// The annotation key and optional template to use for the annotation value
-    #[arg(
-        short,
-        long,
-        long_help = "The annotation key and optional template to use for the annotation value.\nIf not specified, the default template is \"{:last}\".\nExample: annotation-key={0}"
-    )]
-    annotation: Option<String>,
+    /// Can be repeated to add multiple annotations.
+    ///
+    /// Examples:
+    /// * --annotation=annotation-key
+    /// * --annotation=annotation-key={:last} --annotation=other-annotation-key={0}-{1}
+    #[arg(short, long, verbatim_doc_comment)]
+    annotation: Option<Vec<String>>,
     /// Requeue reconciliation of a node after this duration in seconds
     #[arg(long, default_value_t = 300)]
     requeue_duration: u64,
@@ -118,7 +119,7 @@ where
 struct Ctx {
     client: Client,
     labels: Option<Vec<Renderer<LabelTemplate>>>,
-    annotation: Option<Renderer<AnnotationTemplate>>,
+    annotations: Option<Vec<Renderer<AnnotationTemplate>>>,
     requeue_duration: u64,
 }
 
@@ -157,12 +158,14 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         }
 
         let mut annotations = node.metadata.annotations.clone();
-        if let Some(labeler) = &ctx.annotation {
-            let value = labeler.template.render(&provider_id)?;
-            annotations
-                .as_mut()
-                .unwrap_or(&mut BTreeMap::new())
-                .insert(labeler.key.to_string(), value.to_string());
+        if let Some(renderers) = &ctx.annotations {
+            for renderer in renderers.iter() {
+                let value = renderer.template.render(&provider_id)?;
+                annotations
+                    .as_mut()
+                    .unwrap_or(&mut BTreeMap::new())
+                    .insert(renderer.key.to_string(), value.to_string());
+            }
         }
 
         let patch = ObjectMeta {
@@ -210,20 +213,16 @@ async fn run_controller() -> color_eyre::Result<()> {
     let requeue_duration = args.requeue_duration;
 
     let mut labels = parse_renderers(args.label);
-
-    let annotation = args
-        .annotation
-        .map(|s| s.parse::<Renderer<AnnotationTemplate>>())
-        .transpose()?;
+    let annotations = parse_renderers(args.annotation);
 
     // if neither labels or annotations are configured, use a default label and
     // template
-    if annotation.is_none() && labels.is_none() {
+    if annotations.is_none() && labels.is_none() {
         labels = Some(vec![Renderer::default()]);
     }
 
     info!("starting");
-    info!({ labels = ?labels, annotation = ?annotation }, "config");
+    debug!({ labels = ?labels, annotation = ?annotations }, "config");
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
         .shutdown_on_signal()
@@ -233,7 +232,7 @@ async fn run_controller() -> color_eyre::Result<()> {
             Arc::new(Ctx {
                 client,
                 labels,
-                annotation,
+                annotations,
                 requeue_duration,
             }),
         )
