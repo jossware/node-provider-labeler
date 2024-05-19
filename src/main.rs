@@ -45,13 +45,15 @@ enum Error {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    /// The label key and optional template to use for the label value
-    #[arg(
-        short,
-        long,
-        long_help = "The label key and optional template to use for the label value.\nThe default is \"provider-id={:last}\" if no other labels or annotations are configured.\nExample: label-key={:last}"
-    )]
-    label: Option<String>,
+    /// The label key and optional template to use for the label value.
+    /// The default is "provider-id={:last}" if no other labels or annotations are configured.
+    /// Can be repeated to add multiple labels.
+    ///
+    /// Examples:
+    /// * --label=label-key
+    /// * --label=label-key={:last} --label=other-label-key={0}-{1}
+    #[arg(short, long, verbatim_doc_comment)]
+    label: Option<Vec<String>>,
     /// The annotation key and optional template to use for the annotation value
     #[arg(
         short,
@@ -115,7 +117,7 @@ where
 
 struct Ctx {
     client: Client,
-    label: Option<Renderer<LabelTemplate>>,
+    labels: Option<Vec<Renderer<LabelTemplate>>>,
     annotation: Option<Renderer<AnnotationTemplate>>,
     requeue_duration: u64,
 }
@@ -144,12 +146,14 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         // spec.providerID: Forbidden: node updates may not change providerID except from "" to valid
 
         let mut labels = node.metadata.labels.clone();
-        if let Some(renderer) = &ctx.label {
-            let value = renderer.template.render(&provider_id)?;
-            labels
-                .as_mut()
-                .unwrap_or(&mut BTreeMap::new())
-                .insert(renderer.key.to_string(), value.to_string());
+        if let Some(renderers) = &ctx.labels {
+            for renderer in renderers.iter() {
+                let value = renderer.template.render(&provider_id)?;
+                labels
+                    .as_mut()
+                    .unwrap_or(&mut BTreeMap::new())
+                    .insert(renderer.key.to_string(), value.to_string());
+            }
         }
 
         let mut annotations = node.metadata.annotations.clone();
@@ -200,27 +204,26 @@ async fn main() -> ExitCode {
 }
 
 async fn run_controller() -> color_eyre::Result<()> {
-    info!("starting");
     let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
     let requeue_duration = args.requeue_duration;
 
-    let mut label = args
-        .label
-        .map(|s| s.parse::<Renderer<LabelTemplate>>())
-        .transpose()?;
+    let mut labels = parse_renderers(args.label);
 
     let annotation = args
         .annotation
         .map(|s| s.parse::<Renderer<AnnotationTemplate>>())
         .transpose()?;
 
-    // if neither label or annotation is configured, use a default label
-    if annotation.is_none() && label.is_none() {
-        label = Some(Renderer::default());
+    // if neither labels or annotations are configured, use a default label and
+    // template
+    if annotation.is_none() && labels.is_none() {
+        labels = Some(vec![Renderer::default()]);
     }
 
+    info!("starting");
+    info!({ labels = ?labels, annotation = ?annotation }, "config");
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
         .shutdown_on_signal()
@@ -229,7 +232,7 @@ async fn run_controller() -> color_eyre::Result<()> {
             error_policy,
             Arc::new(Ctx {
                 client,
-                label,
+                labels,
                 annotation,
                 requeue_duration,
             }),
@@ -248,4 +251,20 @@ async fn run_controller() -> color_eyre::Result<()> {
     info!("stopping");
 
     Ok(())
+}
+
+fn parse_renderers<T>(args: Option<Vec<String>>) -> Option<Vec<Renderer<T>>>
+where
+    T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
+    Error: std::convert::From<<T as std::str::FromStr>::Err>,
+{
+    if let Some(inner) = args {
+        let x = inner
+            .iter()
+            .map(|s| s.parse::<Renderer<T>>())
+            .collect::<Result<Vec<_>, _>>();
+        x.ok()
+    } else {
+        None
+    }
 }
