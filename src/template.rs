@@ -69,6 +69,7 @@ fn do_render(template: &str, provider_id: &ProviderID, rule: Rule) -> Result<Str
             Rule::last => output.push_str(&provider_id.last()),
             Rule::first => output.push_str(&provider_id.nth(0).unwrap()),
             Rule::all => output.push_str(&provider_id.node_id()),
+            Rule::provider => output.push_str(&provider_id.provider()),
             Rule::nth => {
                 let nth = token.into_inner().next().unwrap().as_str();
                 let idx = nth.parse::<usize>()?;
@@ -102,6 +103,7 @@ mod tests {
         let _ = t("{:last}");
         let _ = t("{:first}");
         let _ = t("{:all}");
+        let _ = t("{:provider}");
         let _ = t("{0}");
         let _ = t("{1}");
         let _ = t("{:last}-{:first}_{:all}.{:last}");
@@ -132,6 +134,9 @@ mod tests {
 
         let output = t("{:all}", &id);
         assert_eq!(output, "us-east-2_i-1234567890abcdef0");
+
+        let output = t("{:provider}", &id);
+        assert_eq!(output, "aws");
 
         let output = t("{0}", &id);
         assert_eq!(output, "us-east-2");
@@ -165,6 +170,9 @@ mod tests {
 
         let output = a("{:all}", &id);
         assert_eq!(output, "us-east-2/i-1234567890abcdef0");
+
+        let output = a("{:provider}", &id);
+        assert_eq!(output, "aws");
 
         let output = a("{0}", &id);
         assert_eq!(output, "us-east-2");
