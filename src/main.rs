@@ -16,7 +16,7 @@ use kube::{
 };
 use meta::MetadataKey;
 use provider_id::ProviderIDError;
-use std::{collections::BTreeMap, process::ExitCode, str::FromStr, sync::Arc, time::Duration};
+use std::{process::ExitCode, str::FromStr, sync::Arc, time::Duration};
 use template::{AnnotationTemplate, LabelTemplate, Template};
 use thiserror::Error;
 use tracing::{debug, error, info, warn};
@@ -24,6 +24,8 @@ use tracing::{debug, error, info, warn};
 const MANAGER: &str = "node-provider-labeler";
 const DEFAULT_KEY_NAME: &str = "provider-id";
 const DEFAULT_TEMPLATE: &str = "{:last}";
+
+type MetadataPairs = std::collections::BTreeMap<String, String>;
 
 #[derive(Error, Debug)]
 enum Error {
@@ -143,17 +145,26 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         let provider_id = ProviderID::new(provider_id)?;
         info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
 
-        let mut payload = ObjectMeta::default();
+        let (new_labels, old_labels) =
+            calculate_metadata_pairs(node.metadata.labels.clone(), &ctx.labels, &provider_id)?;
 
-        if let Some(renderers) = &ctx.labels {
-            payload.labels = Some(render(renderers, &provider_id)?);
+        let (new_annotations, old_annotations) = calculate_metadata_pairs(
+            node.metadata.annotations.clone(),
+            &ctx.annotations,
+            &provider_id,
+        )?;
+
+        if new_labels == old_labels && new_annotations == old_annotations {
+            warn!({ node = node_name }, "no changes to apply");
+            return Ok(Action::requeue(Duration::from_secs(ctx.requeue_duration)));
         }
 
-        if let Some(renderers) = &ctx.annotations {
-            payload.annotations = Some(render(renderers, &provider_id)?);
-        }
-
-        debug!({ node = node_name }, "patching {:?}", payload);
+        let payload = ObjectMeta {
+            labels: Some(new_labels),
+            annotations: Some(new_annotations),
+            ..Default::default()
+        };
+        info!({ node = node_name }, "patching {:?}", payload);
         let patch = payload.into_request_partial::<Node>();
         let node_api: Api<Node> = Api::all(ctx.client.clone());
         node_api
@@ -232,21 +243,30 @@ async fn run_controller() -> color_eyre::Result<()> {
     Ok(())
 }
 
-fn render<T>(
-    renderers: &[Renderer<T>],
+fn calculate_metadata_pairs<T>(
+    current: Option<MetadataPairs>,
+    renderers: &Option<Vec<Renderer<T>>>,
     provider_id: &ProviderID,
-) -> Result<BTreeMap<String, String>, Error>
+) -> Result<(MetadataPairs, MetadataPairs), Error>
 where
     T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
     Error: std::convert::From<<T as std::str::FromStr>::Err>,
 {
-    let mut fields = BTreeMap::new();
-    for renderer in renderers.iter() {
-        let key = renderer.key.to_string();
-        let value = renderer.template.render(provider_id)?;
-        fields.insert(key, value);
+    let current = current.unwrap_or_default();
+    let mut old = MetadataPairs::new();
+    let mut new = MetadataPairs::new();
+
+    if let Some(renderers) = renderers {
+        for r in renderers {
+            let key = r.key.to_string();
+            let value = r.template.render(provider_id)?;
+            if let Some(v) = current.get(&key).cloned() {
+                old.insert(key.clone(), v);
+            }
+            new.insert(key, value);
+        }
     }
-    Ok(fields)
+    Ok((new, old))
 }
 
 fn parse_renderers<T>(args: Option<Vec<String>>) -> Option<Vec<Renderer<T>>>
@@ -262,5 +282,85 @@ where
         x.ok()
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calculate_metadata_pairs() {
+        let provider_id = ProviderID::new("fake://region/instance").unwrap();
+
+        {
+            // no renderers
+            let renderers: Option<Vec<Renderer<LabelTemplate>>> = None;
+            let current = Some(MetadataPairs::new());
+            let (old, new) = calculate_metadata_pairs(current, &renderers, &provider_id).unwrap();
+            assert_eq!(old, new);
+            assert!(new.is_empty());
+        }
+
+        {
+            // new node with single default renderer
+            let renderer: Renderer<LabelTemplate> = Renderer::default();
+            let renderers = Some(vec![renderer]);
+            let current = Some(MetadataPairs::new());
+            let (new, old) = calculate_metadata_pairs(current, &renderers, &provider_id).unwrap();
+            assert_ne!(new, old);
+            assert!(!new.is_empty());
+            assert_eq!("instance", new.get("provider-id").unwrap());
+        }
+
+        {
+            // already reconciled node
+            let renderers: Option<Vec<Renderer<AnnotationTemplate>>> = Some(vec![
+                Renderer::from_str("some={:last}").unwrap(),
+                Renderer::from_str("other={:first}").unwrap(),
+            ]);
+            let mut current = MetadataPairs::new();
+            current.insert("some".to_string(), "instance".to_string());
+            current.insert("other".to_string(), "region".to_string());
+            let (new, old) =
+                calculate_metadata_pairs(Some(current), &renderers, &provider_id).unwrap();
+            assert_eq!(new, old);
+            assert!(!new.is_empty());
+            assert_eq!("instance", new.get("some").unwrap());
+            assert_eq!("region", new.get("other").unwrap());
+        }
+
+        {
+            // node with one key missing
+            let renderers: Option<Vec<Renderer<AnnotationTemplate>>> = Some(vec![
+                Renderer::from_str("some={:last}").unwrap(),
+                Renderer::from_str("other={:first}").unwrap(),
+            ]);
+            let mut current = MetadataPairs::new();
+            current.insert("some".to_string(), "instance".to_string());
+            let (new, old) =
+                calculate_metadata_pairs(Some(current), &renderers, &provider_id).unwrap();
+            assert_ne!(new, old);
+            assert!(!new.is_empty());
+            assert_eq!("instance", new.get("some").unwrap());
+            assert_eq!("region", new.get("other").unwrap());
+        }
+
+        {
+            // node with one different value
+            let renderers: Option<Vec<Renderer<AnnotationTemplate>>> = Some(vec![
+                Renderer::from_str("some={:last}").unwrap(),
+                Renderer::from_str("other={:first}").unwrap(),
+            ]);
+            let mut current = MetadataPairs::new();
+            current.insert("some".to_string(), "instance".to_string());
+            current.insert("other".to_string(), "notregion".to_string());
+            let (new, old) =
+                calculate_metadata_pairs(Some(current), &renderers, &provider_id).unwrap();
+            assert_ne!(new, old);
+            assert!(!new.is_empty());
+            assert_eq!("instance", new.get("some").unwrap());
+            assert_eq!("region", new.get("other").unwrap());
+        }
     }
 }
