@@ -43,7 +43,6 @@ enum Error {
     MetadataKey(String),
 }
 
-// TODO: update help text
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
@@ -65,7 +64,7 @@ struct Args {
     #[arg(short, long, verbatim_doc_comment)]
     annotation: Option<Vec<String>>,
     /// Requeue reconciliation of a node after this duration in seconds
-    #[arg(long, default_value_t = 300)]
+    #[arg(long, default_value_t = 3600)]
     requeue_duration: u64,
 }
 
