@@ -196,14 +196,14 @@ async fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-async fn run_controller() -> color_eyre::Result<()> {
+async fn run_controller() -> Result<(), Error> {
     let args = Args::parse();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
     let requeue_duration = args.requeue_duration;
 
-    let mut labels = parse_renderers(args.label);
-    let annotations = parse_renderers(args.annotation);
+    let mut labels = parse_renderers(args.label)?;
+    let annotations = parse_renderers(args.annotation)?;
 
     // if neither labels or annotations are configured, use a default label and
     // template
@@ -269,20 +269,17 @@ where
     Ok((new, old))
 }
 
-fn parse_renderers<T>(args: Option<Vec<String>>) -> Option<Vec<Renderer<T>>>
+fn parse_renderers<T>(args: Option<Vec<String>>) -> Result<Option<Vec<Renderer<T>>>, Error>
 where
     T: std::fmt::Debug + std::default::Default + Template + std::str::FromStr,
     Error: std::convert::From<<T as std::str::FromStr>::Err>,
 {
-    if let Some(inner) = args {
-        let x = inner
-            .iter()
+    args.map(|list| {
+        list.iter()
             .map(|s| s.parse::<Renderer<T>>())
-            .collect::<Result<Vec<_>, _>>();
-        x.ok()
-    } else {
-        None
-    }
+            .collect::<Result<Vec<_>, _>>()
+    })
+    .transpose()
 }
 
 #[cfg(test)]
