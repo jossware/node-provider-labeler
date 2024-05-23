@@ -142,7 +142,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
 
     if let Some(provider_id) = provider_id {
         let provider_id = ProviderID::new(provider_id)?;
-        info!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
+        debug!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
 
         let (new_labels, old_labels) =
             calculate_metadata_pairs(node.metadata.labels.clone(), &ctx.labels, &provider_id)?;
@@ -154,7 +154,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         )?;
 
         if new_labels == old_labels && new_annotations == old_annotations {
-            warn!({ node = node_name }, "no changes to apply");
+            debug!({ node = node_name }, "no changes to apply");
             return Ok(Action::requeue(Duration::from_secs(ctx.requeue_duration)));
         }
 
@@ -163,7 +163,8 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
             annotations: Some(new_annotations),
             ..Default::default()
         };
-        info!({ node = node_name }, "patching {:?}", payload);
+        info!({ node = node_name }, "patching");
+        debug!({ node = node_name }, "payload {:?}", payload);
         let patch = payload.into_request_partial::<Node>();
         let node_api: Api<Node> = Api::all(ctx.client.clone());
         node_api
