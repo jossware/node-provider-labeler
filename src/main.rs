@@ -53,7 +53,11 @@ struct Args {
 #[tokio::main]
 async fn main() -> ExitCode {
     tracing_subscriber::fmt::init();
-    if let Err(e) = controller::run_controller().await {
+    let args = Args::parse();
+
+    if let Err(e) =
+        controller::run_controller(args.label, args.annotation, args.requeue_duration).await
+    {
         error!({ error = e.to_string() }, "unable to run controller");
         return ExitCode::FAILURE;
     }

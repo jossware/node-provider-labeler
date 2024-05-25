@@ -2,9 +2,8 @@ use crate::{
     meta::MetadataKey,
     provider_id::ProviderID,
     template::{AnnotationTemplate, LabelTemplate, Template},
-    Args, Error,
+    Error,
 };
-use clap::Parser;
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
@@ -140,14 +139,16 @@ fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
 
-pub(crate) async fn run_controller() -> Result<(), Error> {
-    let args = Args::parse();
+pub(crate) async fn run_controller(
+    label_templates: Option<Vec<String>>,
+    annotation_templates: Option<Vec<String>>,
+    requeue_duration: u64,
+) -> Result<(), Error> {
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
-    let requeue_duration = args.requeue_duration;
 
-    let mut labels = parse_renderers(args.label)?;
-    let annotations = parse_renderers(args.annotation)?;
+    let mut labels = parse_renderers(label_templates)?;
+    let annotations = parse_renderers(annotation_templates)?;
 
     // if neither labels or annotations are configured, use a default label and
     // template
