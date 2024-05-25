@@ -139,7 +139,7 @@ fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(5))
 }
 
-pub(crate) async fn run_controller(
+pub(crate) async fn run(
     label_templates: Option<Vec<String>>,
     annotation_templates: Option<Vec<String>>,
     requeue_duration: u64,
