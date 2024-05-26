@@ -5,7 +5,10 @@ mod template;
 
 use clap::Parser;
 use provider_id::ProviderIDError;
-use std::process::ExitCode;
+use std::{
+    process::ExitCode,
+    sync::{Arc, RwLock},
+};
 use thiserror::Error;
 use tracing::error;
 
@@ -50,12 +53,25 @@ struct Args {
     requeue_duration: u64,
 }
 
+#[derive(Clone, Default, Debug)]
+struct State {
+    error_count: Arc<RwLock<u64>>,
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     tracing_subscriber::fmt::init();
     let args = Args::parse();
+    let state = State::default();
 
-    if let Err(e) = controller::run(args.label, args.annotation, args.requeue_duration).await {
+    if let Err(e) = controller::run(
+        state.clone(),
+        args.label,
+        args.annotation,
+        args.requeue_duration,
+    )
+    .await
+    {
         error!({ error = e.to_string() }, "unable to run controller");
         return ExitCode::FAILURE;
     }

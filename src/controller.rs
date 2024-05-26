@@ -2,7 +2,7 @@ use crate::{
     meta::MetadataKey,
     provider_id::ProviderID,
     template::{AnnotationTemplate, LabelTemplate, Template},
-    Error,
+    Error, State,
 };
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
@@ -11,7 +11,11 @@ use kube::{
     runtime::{controller::Action, watcher, Config, Controller},
     Api, Client, ResourceExt,
 };
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{
+    str::FromStr,
+    sync::{Arc, RwLock},
+    time::Duration,
+};
 use tracing::{debug, error, info, warn};
 
 const MANAGER: &str = "node-provider-labeler";
@@ -136,10 +140,11 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
 fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
     let name = object.name_any();
     error!({ node = name }, "error processing node: {}", error);
-    Action::requeue(Duration::from_secs(5))
+    Action::requeue(Duration::from_secs(60))
 }
 
 pub(crate) async fn run(
+    state: State,
     label_templates: Option<Vec<String>>,
     annotation_templates: Option<Vec<String>>,
     requeue_duration: u64,
@@ -171,13 +176,17 @@ pub(crate) async fn run(
                 requeue_duration,
             }),
         )
-        .for_each(|res| async move {
+        .for_each(|res| async {
             match res {
                 Ok(o) => {
                     let node_name = o.0.clone().name;
                     debug!({ node = node_name }, "reconciled");
+                    reset_error(&state.error_count);
                 }
-                Err(e) => error!("reconcile error: {:?}", e),
+                Err(e) => {
+                    error!("watcher error: {:?}", e);
+                    inc_error(&state.error_count);
+                }
             }
         })
         .await;
@@ -185,6 +194,20 @@ pub(crate) async fn run(
     info!("stopping");
 
     Ok(())
+}
+
+fn inc_error(c: &Arc<RwLock<u64>>) {
+    if let Ok(mut c) = c.write() {
+        info!("increasing error count");
+        *c = c.wrapping_add(1);
+    }
+}
+
+fn reset_error(c: &Arc<RwLock<u64>>) {
+    if let Ok(mut c) = c.write() {
+        info!("resetting error count");
+        *c = 0;
+    }
 }
 
 fn calculate_metadata_pairs<T>(
