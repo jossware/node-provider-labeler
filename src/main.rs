@@ -1,15 +1,15 @@
 mod controller;
+mod diagnostics;
 mod meta;
 mod provider_id;
 mod template;
 
 use clap::Parser;
+use diagnostics::Diagnostics;
 use provider_id::ProviderIDError;
-use std::{
-    process::ExitCode,
-    sync::{Arc, RwLock},
-};
+use std::{process::ExitCode, sync::Arc};
 use thiserror::Error;
+use tokio::sync::RwLock;
 use tracing::error;
 
 #[derive(Error, Debug)]
@@ -53,9 +53,9 @@ struct Args {
     requeue_duration: u64,
 }
 
-#[derive(Clone, Default, Debug)]
+#[derive(Debug, Default)]
 struct State {
-    error_count: Arc<RwLock<u64>>,
+    diagnostics: Arc<RwLock<Diagnostics>>,
 }
 
 #[tokio::main]
@@ -64,16 +64,11 @@ async fn main() -> ExitCode {
     let args = Args::parse();
     let state = State::default();
 
-    if let Err(e) = controller::run(
-        state.clone(),
-        args.label,
-        args.annotation,
-        args.requeue_duration,
-    )
-    .await
-    {
-        error!({ error = e.to_string() }, "unable to run controller");
-        return ExitCode::FAILURE;
+    match controller::run(state, args.label, args.annotation, args.requeue_duration).await {
+        Ok(_) => ExitCode::SUCCESS,
+        Err(e) => {
+            error!({ error = e.to_string() }, "unable to run controller");
+            ExitCode::FAILURE
+        }
     }
-    ExitCode::SUCCESS
 }

@@ -1,4 +1,5 @@
 use crate::{
+    diagnostics::Diagnostics,
     meta::MetadataKey,
     provider_id::ProviderID,
     template::{AnnotationTemplate, LabelTemplate, Template},
@@ -11,11 +12,9 @@ use kube::{
     runtime::{controller::Action, watcher, Config, Controller},
     Api, Client, ResourceExt,
 };
-use std::{
-    str::FromStr,
-    sync::{Arc, RwLock},
-    time::Duration,
-};
+use std::{str::FromStr, sync::Arc, time::Duration};
+use time::OffsetDateTime;
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 const MANAGER: &str = "node-provider-labeler";
@@ -78,15 +77,19 @@ struct Ctx {
     labels: Option<Vec<Renderer<LabelTemplate>>>,
     annotations: Option<Vec<Renderer<AnnotationTemplate>>>,
     requeue_duration: u64,
+    diagnostics: Arc<RwLock<Diagnostics>>,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
+    ctx.diagnostics.write().await.last_event = OffsetDateTime::now_utc();
+
     let node_name = node
         .metadata
         .name
         .as_ref()
         .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
 
+    // let d = &ctx.diagnostics.read().unwrap().error_count;
     debug!({ node = node_name }, "reconciling");
 
     let provider_id = node
@@ -149,6 +152,7 @@ pub(crate) async fn run(
     annotation_templates: Option<Vec<String>>,
     requeue_duration: u64,
 ) -> Result<(), Error> {
+    let diagnostics = state.diagnostics.clone();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
 
@@ -174,6 +178,7 @@ pub(crate) async fn run(
                 labels,
                 annotations,
                 requeue_duration,
+                diagnostics: diagnostics.clone(),
             }),
         )
         .for_each(|res| async {
@@ -181,11 +186,14 @@ pub(crate) async fn run(
                 Ok(o) => {
                     let node_name = o.0.clone().name;
                     debug!({ node = node_name }, "reconciled");
-                    reset_error(&state.error_count);
                 }
                 Err(e) => {
                     error!("watcher error: {:?}", e);
-                    inc_error(&state.error_count);
+                    diagnostics
+                        .write()
+                        .await
+                        .error_count
+                        .refresh_and_push_back(1);
                 }
             }
         })
@@ -194,20 +202,6 @@ pub(crate) async fn run(
     info!("stopping");
 
     Ok(())
-}
-
-fn inc_error(c: &Arc<RwLock<u64>>) {
-    if let Ok(mut c) = c.write() {
-        info!("increasing error count");
-        *c = c.wrapping_add(1);
-    }
-}
-
-fn reset_error(c: &Arc<RwLock<u64>>) {
-    if let Ok(mut c) = c.write() {
-        info!("resetting error count");
-        *c = 0;
-    }
 }
 
 fn calculate_metadata_pairs<T>(
