@@ -4,12 +4,13 @@ mod meta;
 mod provider_id;
 mod template;
 
+use axum::{routing::get, Router};
 use clap::Parser;
 use diagnostics::Diagnostics;
 use provider_id::ProviderIDError;
-use std::{process::ExitCode, sync::Arc};
+use std::{future::IntoFuture, process::ExitCode, sync::Arc};
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::{net::TcpListener, sync::RwLock};
 use tracing::error;
 
 #[derive(Error, Debug)]
@@ -64,11 +65,36 @@ async fn main() -> ExitCode {
     let args = Args::parse();
     let state = State::default();
 
-    match controller::run(state, args.label, args.annotation, args.requeue_duration).await {
-        Ok(_) => ExitCode::SUCCESS,
+    let app = Router::new().route("/health", get(health));
+    let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    let server = axum::serve(listener, app)
+        .with_graceful_shutdown(async {
+            tokio::signal::ctrl_c().await.unwrap();
+        })
+        .into_future();
+    let controller = controller::run(state, args.label, args.annotation, args.requeue_duration);
+
+    let (c, s) = tokio::join!(controller, server);
+
+    match c {
+        Ok(_) => (),
         Err(e) => {
             error!({ error = e.to_string() }, "unable to run controller");
-            ExitCode::FAILURE
+            return ExitCode::FAILURE;
         }
     }
+
+    match s {
+        Ok(_) => (),
+        Err(e) => {
+            error!({ error = e.to_string() }, "unable to run server");
+            return ExitCode::FAILURE;
+        }
+    }
+
+    ExitCode::SUCCESS
+}
+
+async fn health() -> &'static str {
+    "OK"
 }
