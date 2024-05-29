@@ -11,6 +11,7 @@ pub(crate) struct Diagnostics {
 impl Default for Diagnostics {
     fn default() -> Self {
         Self {
+            // TODO: configurable duration
             error_count: TtlQueue::new(Duration::from_secs(60)),
             last_event: OffsetDateTime::now_utc(),
         }

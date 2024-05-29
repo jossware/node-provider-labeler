@@ -4,7 +4,7 @@ mod meta;
 mod provider_id;
 mod template;
 
-use axum::{routing::get, Router};
+use axum::{extract, http::StatusCode, routing::get, Router};
 use clap::Parser;
 use diagnostics::Diagnostics;
 use provider_id::ProviderIDError;
@@ -54,7 +54,7 @@ struct Args {
     requeue_duration: u64,
 }
 
-#[derive(Debug, Default)]
+#[derive(Clone, Debug, Default)]
 struct State {
     diagnostics: Arc<RwLock<Diagnostics>>,
 }
@@ -65,7 +65,9 @@ async fn main() -> ExitCode {
     let args = Args::parse();
     let state = State::default();
 
-    let app = Router::new().route("/health", get(health));
+    let app = Router::new()
+        .route("/health", get(health))
+        .with_state(state.clone());
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     let server = axum::serve(listener, app)
         .with_graceful_shutdown(async {
@@ -95,6 +97,11 @@ async fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-async fn health() -> &'static str {
-    "OK"
+async fn health(extract::State(state): extract::State<State>) -> (StatusCode, &'static str) {
+    let err_count = state.diagnostics.write().await.error_count.refresh();
+    if err_count > 3 {
+        (StatusCode::INTERNAL_SERVER_ERROR, "Unhealthy")
+    } else {
+        (StatusCode::OK, "OK")
+    }
 }
