@@ -5,6 +5,7 @@ pub(crate) struct Metrics {
     pub reconciliations: IntCounterVec,
     pub reconciliation_failures: IntCounterVec,
     pub controller_failures: IntCounter,
+    pub object_not_found: IntCounterVec,
     pub reconcile_duration: HistogramVec,
 }
 
@@ -20,6 +21,14 @@ impl Default for Metrics {
                 prometheus::Opts::new(
                     "reconciliation_failures",
                     "Number of reconciliation failures",
+                ),
+                &["name"],
+            )
+            .unwrap(),
+            object_not_found: IntCounterVec::new(
+                prometheus::Opts::new(
+                    "object_not_found_errors",
+                    "Number of object not found errors",
                 ),
                 &["name"],
             )
@@ -62,5 +71,9 @@ impl Metrics {
 
     pub(crate) fn observe_controller_failure(&self) {
         self.controller_failures.inc();
+    }
+
+    pub(crate) fn observe_object_not_found_error(&self, name: &str) {
+        self.object_not_found.with_label_values(&[name]).inc();
     }
 }

@@ -10,8 +10,14 @@ use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
     api::{ObjectMeta, PartialObjectMetaExt, Patch, PatchParams},
-    runtime::{controller::Action, watcher, Config, Controller},
-    Api, Client, ResourceExt,
+    runtime::{
+        controller::{
+            Action,
+            Error::{ObjectNotFound, QueueError, ReconcilerFailed, RunnerError},
+        },
+        watcher, Config, Controller,
+    },
+    Api, Client,
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 use time::OffsetDateTime;
@@ -142,10 +148,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
     Ok(Action::requeue(Duration::from_secs(ctx.requeue_duration)))
 }
 
-fn error_policy(object: Arc<Node>, error: &Error, ctx: Arc<Ctx>) -> Action {
-    let name = object.name_any();
-    error!({ node = name }, "error processing node: {}", error);
-    ctx.metrics.observe_reconciliation_failure(&name);
+fn error_policy(_object: Arc<Node>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
     Action::requeue(Duration::from_secs(60))
 }
 
@@ -192,15 +195,25 @@ pub(crate) async fn run(
                     let node_name = o.0.clone().name;
                     debug!({ node = node_name }, "reconciled");
                 }
-                Err(e) => {
-                    error!("watcher error: {:?}", e);
-                    metrics.observe_controller_failure();
-                    diagnostics
-                        .write()
-                        .await
-                        .error_count
-                        .refresh_and_push_back(1);
-                }
+                Err(e) => match e {
+                    QueueError(_) | RunnerError(_) => {
+                        error!("internal error: {e}");
+                        metrics.observe_controller_failure();
+                        diagnostics
+                            .write()
+                            .await
+                            .error_count
+                            .refresh_and_push_back(1);
+                    }
+                    ReconcilerFailed(e, o) => {
+                        error!({ node = o.name }, "reconciliation failed: {e}");
+                        metrics.observe_reconciliation_failure(&o.name);
+                    }
+                    ObjectNotFound(o) => {
+                        warn!({ node = o.name }, "object not found");
+                        metrics.observe_object_not_found_error(&o.name);
+                    }
+                },
             }
         })
         .await;
