@@ -1,6 +1,7 @@
 use crate::{
     diagnostics::Diagnostics,
     meta::MetadataKey,
+    metrics::Metrics,
     provider_id::ProviderID,
     template::{AnnotationTemplate, LabelTemplate, Template},
     Error, State,
@@ -78,6 +79,7 @@ struct Ctx {
     annotations: Option<Vec<Renderer<AnnotationTemplate>>>,
     requeue_duration: u64,
     diagnostics: Arc<RwLock<Diagnostics>>,
+    metrics: Metrics,
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
@@ -89,8 +91,8 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         .as_ref()
         .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
 
-    // let d = &ctx.diagnostics.read().unwrap().error_count;
     debug!({ node = node_name }, "reconciling");
+    ctx.metrics.observe_reconciliation(node_name);
 
     let provider_id = node
         .spec
@@ -140,9 +142,10 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
     Ok(Action::requeue(Duration::from_secs(ctx.requeue_duration)))
 }
 
-fn error_policy(object: Arc<Node>, error: &Error, _ctx: Arc<Ctx>) -> Action {
+fn error_policy(object: Arc<Node>, error: &Error, ctx: Arc<Ctx>) -> Action {
     let name = object.name_any();
     error!({ node = name }, "error processing node: {}", error);
+    ctx.metrics.observe_reconciliation_failure(&name);
     Action::requeue(Duration::from_secs(60))
 }
 
@@ -153,6 +156,7 @@ pub(crate) async fn run(
     requeue_duration: u64,
 ) -> Result<(), Error> {
     let diagnostics = state.diagnostics.clone();
+    let metrics = Metrics::default().register(&state.registry).unwrap();
     let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
 
@@ -178,6 +182,7 @@ pub(crate) async fn run(
                 labels,
                 annotations,
                 requeue_duration,
+                metrics: metrics.clone(),
                 diagnostics: diagnostics.clone(),
             }),
         )
@@ -189,6 +194,7 @@ pub(crate) async fn run(
                 }
                 Err(e) => {
                     error!("watcher error: {:?}", e);
+                    metrics.observe_controller_failure();
                     diagnostics
                         .write()
                         .await

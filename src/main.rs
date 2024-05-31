@@ -1,17 +1,19 @@
 mod controller;
 mod diagnostics;
 mod meta;
+mod metrics;
 mod provider_id;
 mod template;
 
 use axum::{extract, http::StatusCode, routing::get, Router};
 use clap::Parser;
 use diagnostics::Diagnostics;
+use prometheus::{Encoder, TextEncoder};
 use provider_id::ProviderIDError;
 use std::{future::IntoFuture, process::ExitCode, sync::Arc};
 use thiserror::Error;
 use tokio::{net::TcpListener, sync::RwLock};
-use tracing::error;
+use tracing::{error, warn};
 
 #[derive(Error, Debug)]
 enum Error {
@@ -57,6 +59,14 @@ struct Args {
 #[derive(Clone, Debug, Default)]
 struct State {
     diagnostics: Arc<RwLock<Diagnostics>>,
+    /// Metrics registry
+    registry: prometheus::Registry,
+}
+
+impl State {
+    fn metrics(&self) -> Vec<prometheus::proto::MetricFamily> {
+        self.registry.gather()
+    }
 }
 
 #[tokio::main]
@@ -67,6 +77,7 @@ async fn main() -> ExitCode {
 
     let app = Router::new()
         .route("/health", get(health))
+        .route("/metrics", get(metrics))
         .with_state(state.clone());
     let listener = TcpListener::bind("0.0.0.0:8080").await.unwrap();
     let server = axum::serve(listener, app)
@@ -95,6 +106,21 @@ async fn main() -> ExitCode {
     }
 
     ExitCode::SUCCESS
+}
+
+async fn metrics(extract::State(state): extract::State<State>) -> (StatusCode, Vec<u8>) {
+    let m = state.metrics();
+    let encoder = TextEncoder::new();
+    let mut buffer = vec![];
+    if let Err(e) = encoder.encode(&m, &mut buffer) {
+        warn!({ error = e.to_string() }, "error encoding metrics");
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            "internal server error".into(),
+        );
+    }
+
+    (StatusCode::OK, buffer)
 }
 
 async fn health(extract::State(state): extract::State<State>) -> (StatusCode, &'static str) {
