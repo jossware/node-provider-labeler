@@ -89,7 +89,7 @@ struct Ctx {
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
-    let _ = ctx.metrics.observe_reconciliation();
+    let _timer = ctx.metrics.observe_reconciliation();
     ctx.diagnostics.write().await.last_event = OffsetDateTime::now_utc();
 
     let node_name = node

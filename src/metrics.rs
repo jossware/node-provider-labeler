@@ -82,8 +82,7 @@ pub struct ReconciliationTimer {
 
 impl Drop for ReconciliationTimer {
     fn drop(&mut self) {
-        self.metric
-            .with_label_values(&[])
-            .observe(self.start.elapsed().as_millis() as f64 / 1000.0);
+        let elapsed = self.start.elapsed().as_millis() as f64 / 1000.0;
+        self.metric.with_label_values(&[]).observe(elapsed);
     }
 }

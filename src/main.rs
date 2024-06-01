@@ -125,7 +125,7 @@ async fn metrics(extract::State(state): extract::State<State>) -> (StatusCode, V
 
 async fn health(extract::State(state): extract::State<State>) -> (StatusCode, &'static str) {
     let err_count = state.diagnostics.write().await.error_count.refresh();
-    if err_count > 3 {
+    if err_count > 0 {
         (StatusCode::INTERNAL_SERVER_ERROR, "Unhealthy")
     } else {
         (StatusCode::OK, "OK")
