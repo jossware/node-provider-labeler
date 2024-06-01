@@ -158,6 +158,9 @@ pub(crate) async fn run(
     annotation_templates: Option<Vec<String>>,
     requeue_duration: u64,
 ) -> Result<(), Error> {
+    const QUEUE_ERROR: &str = "queue";
+    const RUNNER_ERROR: &str = "runner";
+
     let diagnostics = state.diagnostics.clone();
     let metrics = Metrics::default().register(&state.registry).unwrap();
     let client = Client::try_default().await?;
@@ -171,6 +174,14 @@ pub(crate) async fn run(
     if annotations.is_none() && labels.is_none() {
         labels = Some(vec![Renderer::default()]);
     }
+
+    let inc_error_count = || async {
+        diagnostics
+            .write()
+            .await
+            .error_count
+            .refresh_and_push_back(1);
+    };
 
     info!("starting");
     debug!({ labels = ?labels, annotation = ?annotations }, "config");
@@ -196,14 +207,15 @@ pub(crate) async fn run(
                     debug!({ node = node_name }, "reconciled");
                 }
                 Err(e) => match e {
-                    QueueError(_) | RunnerError(_) => {
-                        error!("internal error: {e}");
-                        metrics.observe_controller_failure();
-                        diagnostics
-                            .write()
-                            .await
-                            .error_count
-                            .refresh_and_push_back(1);
+                    QueueError(e) => {
+                        error!("queue error: {e}");
+                        inc_error_count().await;
+                        metrics.observe_controller_failure(QUEUE_ERROR);
+                    }
+                    RunnerError(e) => {
+                        error!("runner error: {e}");
+                        inc_error_count().await;
+                        metrics.observe_controller_failure(RUNNER_ERROR);
                     }
                     ReconcilerFailed(e, o) => {
                         error!({ node = o.name }, "reconciliation failed: {e}");
