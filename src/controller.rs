@@ -89,6 +89,7 @@ struct Ctx {
 }
 
 async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
+    let _ = ctx.metrics.observe_reconciliation();
     ctx.diagnostics.write().await.last_event = OffsetDateTime::now_utc();
 
     let node_name = node
@@ -98,7 +99,6 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         .ok_or_else(|| Error::MissingObjectKey(".metadata.name"))?;
 
     debug!({ node = node_name }, "reconciling");
-    ctx.metrics.observe_reconciliation(node_name);
 
     let provider_id = node
         .spec
@@ -219,11 +219,11 @@ pub(crate) async fn run(
                     }
                     ReconcilerFailed(e, o) => {
                         error!({ node = o.name }, "reconciliation failed: {e}");
-                        metrics.observe_reconciliation_failure(&o.name);
+                        metrics.observe_reconciliation_failure();
                     }
                     ObjectNotFound(o) => {
                         warn!({ node = o.name }, "object not found");
-                        metrics.observe_object_not_found_error(&o.name);
+                        metrics.observe_object_not_found_error();
                     }
                 },
             }
