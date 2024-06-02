@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "nixpkgs"; # Resolves to github:NixOS/nixpkgs
+    flake-utils.url = "github:numtide/flake-utils";
     rust-overlay = {
       url = "github:oxalica/rust-overlay";
       inputs = {
@@ -10,13 +11,19 @@
         flake-utils.follows = "flake-utils";
       };
     };
-    flake-utils.url = "github:numtide/flake-utils";
+    crane = {
+      url = "github:ipetkov/crane";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+      };
+    };
   };
 
   outputs =
     {
       self,
       nixpkgs,
+      crane,
       rust-overlay,
       flake-utils,
     }:
@@ -25,6 +32,46 @@
       let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs { inherit system overlays; };
+        inherit (pkgs) lib;
+
+        craneLib = (crane.mkLib pkgs);
+        src = lib.cleanSourceWith {
+          src = ./.;
+          filter = path: type: (lib.hasSuffix "\.pest" path) || (craneLib.filterCargoSources path type);
+        };
+        nativeBuildInputs =
+          with pkgs;
+          [ pkg-config ]
+          ++ lib.optionals (pkgs.stdenv.isDarwin) [
+            libiconv
+            darwin.apple_sdk.frameworks.Security
+          ];
+        buildInputs = with pkgs; [ ];
+
+        commonArgs = {
+          inherit src nativeBuildInputs buildInputs;
+        };
+
+        cargoArtifacts = craneLib.buildDepsOnly (commonArgs // { pname = "crate-deps"; });
+
+        bin = craneLib.buildPackage (
+          commonArgs
+          // {
+            inherit cargoArtifacts;
+            GIT_REVISION = (if (self ? rev) then self.rev else "dirty");
+          }
+        );
+
+        dockerImage = pkgs.dockerTools.streamLayeredImage {
+          name = bin.pname;
+          config = {
+            Entrypoint = [ "${bin}/bin/${bin.pname}" ];
+          };
+          contents = [
+            bin
+            pkgs.cacert
+          ];
+        };
 
         kwokctl = pkgs.buildGoModule rec {
           pname = "kwokctl";
@@ -120,13 +167,13 @@
       in
       with pkgs;
       {
+        packages = {
+          inherit bin;
+          default = bin;
+          docker = dockerImage;
+        };
         devShell = pkgs.mkShell {
-          nativeBuildInputs =
-            [ ]
-            ++ lib.optionals (pkgs.stdenv.isDarwin) [
-              libiconv
-              darwin.apple_sdk.frameworks.SystemConfiguration
-            ];
+          nativeBuildInputs = nativeBuildInputs;
           buildInputs = with pkgs; [
             kubectl
             kwokctl
