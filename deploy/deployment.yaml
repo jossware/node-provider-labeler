@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    # TODO: recommended labels
+    app: node-provider-labeler
+  name: node-provider-labeler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: node-provider-labeler
+  template:
+    metadata:
+      labels:
+        app: node-provider-labeler
+    spec:
+      serviceAccountName: node-provider-labeler
+      containers:
+        - image: ghcr.io/ryane/node-provider-labeler:main
+          name: node-provider-labeler

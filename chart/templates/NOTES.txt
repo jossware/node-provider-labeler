@@ -1,0 +1,12 @@
+Thank you for installing {{ .Chart.Name }}.
+
+Your release is named {{ .Release.Name }} and is in the {{ .Release.Namespace }} namespace.
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get all {{ .Release.Name }}
+
+To access the http endpoint from your local host, try:
+
+  $ kubectl -n ${{ .Release.Namespace }} port-forward svc/{{ include "node-provider-labeler.fullname" . }} 8080:8080
