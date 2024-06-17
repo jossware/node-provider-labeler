@@ -64,6 +64,7 @@
 
         dockerImage = pkgs.dockerTools.streamLayeredImage {
           name = bin.pname;
+          tag = "latest";
           config = {
             Entrypoint = [ "${bin}/bin/${bin.pname}" ];
           };
@@ -177,6 +178,9 @@
           buildInputs = with pkgs; [
             kubectl
             kwokctl
+            kustomize
+            kfilt
+            kubernetes-helm
             create-cluster
             create-nodes
             delete-nodes
