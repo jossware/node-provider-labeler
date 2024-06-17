@@ -75,6 +75,15 @@ async fn main() -> ExitCode {
     let args = Args::parse();
     let state = State::default();
 
+    tracing::info!("initializing kubernetes client");
+    let client = match kube::Client::try_default().await {
+        Ok(client) => client,
+        Err(e) => {
+            error!({ error = e.to_string() }, "unable to create kube client");
+            return ExitCode::FAILURE;
+        }
+    };
+
     let app = Router::new()
         .route("/health", get(health))
         .route("/metrics", get(metrics))
@@ -85,7 +94,13 @@ async fn main() -> ExitCode {
             tokio::signal::ctrl_c().await.unwrap();
         })
         .into_future();
-    let controller = controller::run(state, args.label, args.annotation, args.requeue_duration);
+    let controller = controller::run(
+        client,
+        state,
+        args.label,
+        args.annotation,
+        args.requeue_duration,
+    );
 
     let (c, s) = tokio::join!(controller, server);
 

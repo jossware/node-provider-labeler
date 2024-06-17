@@ -153,6 +153,7 @@ fn error_policy(_object: Arc<Node>, _error: &Error, _ctx: Arc<Ctx>) -> Action {
 }
 
 pub(crate) async fn run(
+    client: kube::Client,
     state: State,
     label_templates: Option<Vec<String>>,
     annotation_templates: Option<Vec<String>>,
@@ -163,7 +164,6 @@ pub(crate) async fn run(
 
     let diagnostics = state.diagnostics.clone();
     let metrics = Metrics::default().register(&state.registry).unwrap();
-    let client = Client::try_default().await?;
     let node: Api<Node> = Api::all(client.clone());
 
     let mut labels = parse_renderers(label_templates)?;
@@ -183,7 +183,7 @@ pub(crate) async fn run(
             .refresh_and_push_back(1);
     };
 
-    info!("starting");
+    info!("starting controller");
     debug!({ labels = ?labels, annotation = ?annotations }, "config");
     Controller::new(node, watcher::Config::default())
         .with_config(Config::default().concurrency(2))
