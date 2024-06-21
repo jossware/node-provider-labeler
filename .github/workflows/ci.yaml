@@ -6,6 +6,7 @@ on:
       - "gha"
     tags:
       - "v*"
+      - "r*"
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
@@ -23,7 +24,7 @@ jobs:
       matrix:
         platform:
           - linux/amd64
-          - linux/arm64
+          # - linux/arm64
     steps:
       - name: Prepare
         run: |
@@ -128,3 +129,34 @@ jobs:
           release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+
+  release:
+    name: Release - ${{ matrix.platform.release_for }}
+    strategy:
+      matrix:
+        platform:
+          - release_for: x86_64-linux
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            bin: node-provider-labeler
+            name: node-provider-labeler-linux-x86_64.tar.gz
+            command: both
+
+          - release_for: aarch64-linux
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            bin: node-provider-labeler
+            name: node-provider-labeler-linux-aarch64.tar.gz
+            command: both
+
+    runs-on: ${{ matrix.platform.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release"
+          strip: true
