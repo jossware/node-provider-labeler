@@ -188,6 +188,11 @@ jobs:
           args: "--locked --release"
           strip: true
 
+      - name: inspect target
+        run: ls -al target
+      - name: inspect release
+        run: ls -al target/release
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v5
