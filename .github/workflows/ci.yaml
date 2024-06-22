@@ -160,5 +160,7 @@ jobs:
           target: ${{ matrix.platform.target }}
           args: "--locked --release"
           strip: true
-      - name: inspect
+      - name: inspect target
         run: ls -al target
+      - name: inspect release
+        run: ls -al target/release
