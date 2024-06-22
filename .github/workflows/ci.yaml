@@ -193,7 +193,7 @@ jobs:
       - name: inspect release
         run: ls -al target/release
       - name: inspect release platform
-        run: ls -al target/${{ matrix.platform.target }}
+        run: ls -al target/${{ matrix.platform.target }}/release
 
       - name: Build and push by digest
         id: build
@@ -203,7 +203,7 @@ jobs:
           platforms: ${{ matrix.platform.release_for }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            target=${{ matrix.platform.target }}
+            target=${{ matrix.platform.target }}/release
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
