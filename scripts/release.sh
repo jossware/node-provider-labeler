@@ -40,6 +40,13 @@ bump_appversion_in_chart_yaml() {
     rm "${file_path}.bak"
 }
 
+bump_appversion_in_values_yaml() {
+    local file_path=$1
+    local new_version=$2
+    sed -i.bak -E 's/^([[:space:]]*tag:[[:space:]]*").*(")$/\1'"v$new_version"'\2/' "$file_path"
+    rm "${file_path}.bak"
+}
+
 bump_chart_version_in_chart_yaml() {
     local file_path=$1
     local new_version=$2
@@ -57,13 +64,15 @@ release_type=$1
 
 cargo_toml_path="Cargo.toml"
 chart_yaml_path="chart/Chart.yaml"
+values_yaml_path="chart/values.yaml"
 
 if [ "$release_type" == "app" ] || [ "$release_type" == "both" ]; then
     current_version=$(extract_version_from_cargo_toml "$cargo_toml_path")
     new_version=$(increment_version "$current_version")
     bump_version_in_cargo_toml "$cargo_toml_path" "$new_version"
     bump_appversion_in_chart_yaml "$chart_yaml_path" "$new_version"
-    echo "Bumped application version to $new_version in Cargo.toml and appVersion in Chart.yaml"
+    bump_appversion_in_values_yaml "$values_yaml_path" "$new_version"
+    echo "Bumped application version to $new_version in Cargo.toml, appVersion in Chart.yaml, and image.tag in values.yaml"
 fi
 
 if [ "$release_type" == "chart" ] || [ "$release_type" == "both" ]; then

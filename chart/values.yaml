@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/ryane/node-provider-labeler
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "v0.3.0"
 
 imagePullSecrets: []
 nameOverride: ""
@@ -62,7 +62,7 @@ resources:
 
 readinessProbe:
   httpGet:
-    path: /
+    path: /health
     port: http
 
 # Additional volumes on the output Deployment definition.
