@@ -202,8 +202,8 @@ jobs:
           context: .
           platforms: ${{ matrix.platform.release_for }}
           labels: ${{ steps.meta.outputs.labels }}
-          build-args:
-            - target=${{ matrix.platform.target }}
+          build-args: |
+            target=${{ matrix.platform.target }}
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
