@@ -119,6 +119,13 @@ jobs:
           pattern: digests-*
           merge-multiple: true
 
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/binaries
+          pattern: node-provider-labeler-*
+          merge-multiple: true
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -145,13 +152,25 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
-      - name: Create GitHub Release
+      # - name: Create GitHub Release
+      #   if: startsWith(github.ref, 'refs/tags/')
+      #   uses: actions/create-release@v1
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     tag_name: ${{ github.ref }}
+      #     release_name: Release ${{ github.ref_name }}
+      #     draft: false
+      #     prerelease: false
+
+      - name: Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+          draft: false
+          files: |
+            /tmp/binaries/*
