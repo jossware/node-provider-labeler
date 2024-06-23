@@ -84,3 +84,5 @@ if [ "$release_type" == "chart" ] || [ "$release_type" == "both" ]; then
     bump_chart_version_in_chart_yaml "$chart_yaml_path" "$new_chart_version"
     echo "Bumped chart version to $new_chart_version in Chart.yaml"
 fi
+
+cargo build
