@@ -155,8 +155,11 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
+      - name: ls binaries again
+        run: ls -al /tmp/binaries
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
+        # if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           draft: false
@@ -164,4 +167,4 @@ jobs:
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
           files: |
-            /tmp/binaries/*
+            /tmp/binaries/node-provider-labeler*
