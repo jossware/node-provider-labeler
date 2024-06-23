@@ -124,7 +124,7 @@ jobs:
         with:
           path: /tmp/binaries
           pattern: node-provider-labeler-*
-          merge-multiple: true
+          merge-multiple: false
 
       - name: ls binaries
         run: ls -al /tmp/binaries
