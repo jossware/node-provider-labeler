@@ -171,6 +171,5 @@ jobs:
           prerelease: false
           generate_release_notes: true
           name: Release ${{ github.ref_name }}
-          draft: false
           files: |
             /tmp/binaries/*
