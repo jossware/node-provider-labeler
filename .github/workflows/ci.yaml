@@ -124,7 +124,7 @@ jobs:
         with:
           path: bins
           pattern: node-provider-labeler-*
-          merge-multiple: false
+          merge-multiple: true
 
       - name: ls binaries
         run: ls -al bins
