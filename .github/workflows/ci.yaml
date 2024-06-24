@@ -126,9 +126,6 @@ jobs:
           pattern: node-provider-labeler-*
           merge-multiple: false
 
-      - name: ls binaries
-        run: ls -al bins
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -155,19 +152,10 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
-      - name: ls bins again
-        run: |
-          ls -al bins/node-provider-labeler-linux-x86_64
-          ls -al bins/node-provider-labeler-linux-aarch64
-
-      - name: fix up binaries
+      - name: Rename binaries
         run: |
           mv bins/node-provider-labeler-linux-x86_64/node-provider-labeler node-provider-labeler-linux-x86_64
           mv bins/node-provider-labeler-linux-aarch64/node-provider-labeler node-provider-labeler-linux-aarch64
-
-      - name: ls root
-        run: |
-          ls -al
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
