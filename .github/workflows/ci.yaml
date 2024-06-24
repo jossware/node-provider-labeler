@@ -156,7 +156,9 @@ jobs:
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
       - name: ls bins again
-        run: ls -al bins
+        run: |
+          ls -al bins/node-provider-labeler-linux-x86_64
+          ls -al bins/node-provider-labeler-linux-aarch64
 
       - name: Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -168,4 +170,4 @@ jobs:
           name: Release ${{ github.ref_name }}
           fail_on_unmatched_files: true
           files: |
-            bins/node-provider-labeler*
+            bins/**/*
