@@ -63,8 +63,8 @@ fi
 release_type=$1
 
 cargo_toml_path="Cargo.toml"
-chart_yaml_path="chart/Chart.yaml"
-values_yaml_path="chart/values.yaml"
+chart_yaml_path="charts/node-provider-labeler/Chart.yaml"
+values_yaml_path="charts/node-provider-labeler/values.yaml"
 
 if [ "$release_type" == "app" ] || [ "$release_type" == "both" ]; then
     current_version=$(extract_version_from_cargo_toml "$cargo_toml_path")
