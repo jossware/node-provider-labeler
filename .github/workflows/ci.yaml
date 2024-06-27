@@ -184,7 +184,7 @@ jobs:
           fetch-depth: 0 # important parameter
 
       - name: Run chart-releaser
-        uses: helm/chart-releaser-action@main
+        uses: acuD1/chart-releaser-action@main
         with:
           skip_upload: true
         env:
