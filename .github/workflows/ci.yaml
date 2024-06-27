@@ -180,6 +180,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # important parameter
 
       - name: Run chart-releaser
         uses: helm/chart-releaser-action@main
