@@ -169,3 +169,24 @@ jobs:
           files: |
             node-provider-labeler-linux-x86_64
             node-provider-labeler-linux-aarch64
+
+  chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Run chart-releaser
+        uses: acuD1/chart-releaser-action@main
+        with:
+          skip_upload: true
+      - run: |
+          ls -al .cr-release-packages
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
