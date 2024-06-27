@@ -184,6 +184,7 @@ jobs:
       - name: Run chart-releaser
         uses: acuD1/chart-releaser-action@main
         with:
+          charts_dir: chart
           skip_upload: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
