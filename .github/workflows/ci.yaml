@@ -182,14 +182,15 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run chart-releaser
-        uses: acuD1/chart-releaser-action@main
+        uses: helm/chart-releaser-action@main
         with:
-          charts_dir: chart
           skip_upload: true
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       - run: |
+          pwd
+          ls -al
           ls -al .cr-release-packages
 
       - name: Log in to the Container registry
