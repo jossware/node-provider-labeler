@@ -194,7 +194,6 @@ jobs:
       - run: |
           pwd
           ls -al
-          ls -al .cr-release-packages
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
