@@ -189,10 +189,9 @@ jobs:
         with:
           skip_upload: true
           mark_as_latest: false
-          config: |
-            release-name-template: "chart-{{ .Version }}"
         env:
           CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          CR_RELEASE_NAME_TEMPLATE: "chart-{{ .Version }}"
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
