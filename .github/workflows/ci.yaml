@@ -10,7 +10,6 @@ on:
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
-  CHART_IMAGE: ghcr.io/${{ github.repository }}/chart
 
 jobs:
   build:
@@ -190,8 +189,8 @@ jobs:
           skip_upload: true
           mark_as_latest: false
         env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           CR_RELEASE_NAME_TEMPLATE: "chart-{{ .Version }}"
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
@@ -206,5 +205,6 @@ jobs:
             if [ -z "${pkg:-}" ]; then
               break
             fi
-            helm push "${pkg}" oci://ghcr.io/${{ env.CHART_IMAGE }}
+            mv .cr-release-package/node-provider-labeler*.tgz chart.tgz
+            helm push "chart.tgz" oci://ghcr.io/${{ env.REGISTRY_IMAGE }}
           done
