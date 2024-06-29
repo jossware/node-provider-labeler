@@ -182,6 +182,12 @@ jobs:
         with:
           fetch-depth: 0 # important parameter
 
+      - name: diagnostics
+        run: |
+          printenv
+          git config -l
+          git config -l --global
+
       - name: Run chart-releaser
         uses: acuD1/chart-releaser-action@main
         with:
