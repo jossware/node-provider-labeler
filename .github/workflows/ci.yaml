@@ -200,6 +200,7 @@ jobs:
 
       - name: Log in to the Container registry
         uses: docker/login-action@v3
+        if: steps.chart_releaser.outputs.changed_charts != ''
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
