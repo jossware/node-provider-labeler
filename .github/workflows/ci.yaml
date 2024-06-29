@@ -210,6 +210,6 @@ jobs:
             if [ -z "${pkg:-}" ]; then
               break
             fi
-            mv .cr-release-packages/node-provider-labeler*.tgz chart.tgz
+            mv .cr-release-packages/chart-node-provider-labeler*.tgz chart.tgz
             helm push "chart.tgz" oci://ghcr.io/${{ env.REGISTRY_IMAGE }}
           done
