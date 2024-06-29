@@ -189,6 +189,7 @@ jobs:
           git config user.name "Github Actions"
 
       - name: Run chart-releaser
+        id: chart_releaser
         uses: acuD1/chart-releaser-action@main
         with:
           skip_upload: true
@@ -205,6 +206,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Push chart OCI artifact
+        if: steps.chart_releaser.outputs.changed_charts != ''
         run: |
           for pkg in .cr-release-packages/*; do
             if [ -z "${pkg:-}" ]; then
