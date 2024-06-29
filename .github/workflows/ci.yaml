@@ -6,7 +6,6 @@ on:
       - "gha"
     tags:
       - "v*"
-      - "r*"
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
@@ -206,6 +205,6 @@ jobs:
             if [ -z "${pkg:-}" ]; then
               break
             fi
-            mv .cr-release-package/*.tgz chart.tgz
+            mv .cr-release-packages/node-provider-labeler*.tgz chart.tgz
             helm push "chart.tgz" oci://ghcr.io/${{ env.REGISTRY_IMAGE }}
           done
