@@ -186,7 +186,6 @@ jobs:
         run: |
           printenv
           git config -l
-          git config -l --global
 
       - name: Run chart-releaser
         uses: acuD1/chart-releaser-action@main
