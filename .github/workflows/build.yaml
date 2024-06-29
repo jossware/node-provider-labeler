@@ -1,4 +1,4 @@
-name: ci
+name: Build
 on:
   push:
     branches:
@@ -9,7 +9,6 @@ on:
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
-  REGISTRY_CHART: ghcr.io/${{ github.repository_owner }}/charts
 
 jobs:
   build:
@@ -164,54 +163,8 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          name: Release ${{ github.ref_name }}
+          name: node-provider-labeler ${{ github.ref_name }}
           fail_on_unmatched_files: true
           files: |
             node-provider-labeler-linux-x86_64
             node-provider-labeler-linux-aarch64
-
-  chart:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      packages: write
-      attestations: write
-      id-token: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # important parameter
-
-      - name: Configure git author
-        run: |
-          git config user.email "runner-$(hostname)@github.com"
-          git config user.name "Github Actions"
-
-      - name: Run chart-releaser
-        id: chart_releaser
-        uses: acuD1/chart-releaser-action@main
-        with:
-          skip_upload: true
-          mark_as_latest: false
-        env:
-          CR_RELEASE_NAME_TEMPLATE: "chart-{{ .Version }}"
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-
-      - name: Log in to the Container registry
-        uses: docker/login-action@v3
-        if: steps.chart_releaser.outputs.changed_charts != ''
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push chart OCI artifact
-        if: steps.chart_releaser.outputs.changed_charts != ''
-        run: |
-          for pkg in .cr-release-packages/*; do
-            if [ -z "${pkg:-}" ]; then
-              break
-            fi
-            helm push "${pkg}" oci://${{ env.REGISTRY_CHART }}
-          done
