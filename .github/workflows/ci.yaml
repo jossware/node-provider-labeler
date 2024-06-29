@@ -206,11 +206,9 @@ jobs:
 
       - name: Push chart OCI artifact
         run: |
-          ls -al .cr-release-packages/*
           for pkg in .cr-release-packages/*; do
             if [ -z "${pkg:-}" ]; then
               break
             fi
-            mv .cr-release-packages/chart-node-provider-labeler*.tgz chart.tgz
             helm push "${pkg}" oci://${{ env.REGISTRY_CHART }}
           done
