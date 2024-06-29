@@ -186,6 +186,9 @@ jobs:
         run: |
           printenv
           git config -l
+          hostname
+          git config user.email "runner@github.com"
+          git config user.name "Github Actions"
 
       - name: Run chart-releaser
         uses: acuD1/chart-releaser-action@main
