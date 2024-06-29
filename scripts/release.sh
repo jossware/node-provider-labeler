@@ -23,7 +23,7 @@ extract_version_from_cargo_toml() {
 
 extract_chart_version_from_chart_yaml() {
     local file_path=$1
-    grep -E '^version: "[0-9]+"' "$file_path" | cut -d '"' -f 2
+    grep -E '^version: "[0-9]+\.[0-9]+\.[0-9]+"' "$file_path" | cut -d '"' -f 2
 }
 
 bump_version_in_cargo_toml() {
@@ -77,10 +77,7 @@ fi
 
 if [ "$release_type" == "chart" ] || [ "$release_type" == "both" ]; then
     current_chart_version=$(extract_chart_version_from_chart_yaml "$chart_yaml_path")
-    if [[ -z "$current_chart_version" ]]; then
-        current_chart_version=0
-    fi
-    new_chart_version=$((current_chart_version + 1))
+    new_chart_version=$(increment_version "$current_chart_version")
     bump_chart_version_in_chart_yaml "$chart_yaml_path" "$new_chart_version"
     echo "Bumped chart version to $new_chart_version in Chart.yaml"
 fi

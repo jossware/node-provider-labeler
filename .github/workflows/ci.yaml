@@ -8,7 +8,8 @@ on:
       - "v*"
 env:
   REGISTRY: ghcr.io
-  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+  REGISTRY_IMAGE: ${{ env.REGISTRY }}/${{ github.repository }}
+  REGISTRY_CHART: ${{ env.REGISTRY }}/${{ github.repository_owner }}/charts
 
 jobs:
   build:
@@ -211,5 +212,5 @@ jobs:
               break
             fi
             mv .cr-release-packages/chart-node-provider-labeler*.tgz chart.tgz
-            helm push "chart.tgz" oci://ghcr.io/${{ env.REGISTRY_IMAGE }}
+            helm push "${pkg}" oci://${{ env.REGISTRY_CHART }}
           done
