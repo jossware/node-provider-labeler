@@ -182,12 +182,9 @@ jobs:
         with:
           fetch-depth: 0 # important parameter
 
-      - name: diagnostics
+      - name: Configure git author
         run: |
-          printenv
-          git config -l
-          hostname
-          git config user.email "runner@github.com"
+          git config user.email "runner-$(hostname)@github.com"
           git config user.name "Github Actions"
 
       - name: Run chart-releaser
