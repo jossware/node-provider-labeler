@@ -1,0 +1,58 @@
+name: Chart
+on:
+  push:
+    branches:
+      - "main"
+      - "gha"
+    tags:
+      - "chart-"
+env:
+  REGISTRY: ghcr.io
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/charts
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # important parameter
+
+      - name: Configure git author
+        run: |
+          git config user.email "runner-$(hostname)@github.com"
+          git config user.name "Github Actions"
+
+      - name: Run chart-releaser
+        id: chart_releaser
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: acuD1/chart-releaser-action@main
+        with:
+          skip_upload: true
+          mark_as_latest: false
+        env:
+          CR_RELEASE_NAME_TEMPLATE: "chart-{{ .Version }}"
+          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Log in to the Container registry
+        uses: docker/login-action@v3
+        if: steps.chart_releaser.outputs.changed_charts != ''
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push chart OCI artifact
+        if: steps.chart_releaser.outputs.changed_charts != ''
+        run: |
+          for pkg in .cr-release-packages/*; do
+            if [ -z "${pkg:-}" ]; then
+              break
+            fi
+            helm push "${pkg}" oci://${{ env.REGISTRY_IMAGE }}
+          done

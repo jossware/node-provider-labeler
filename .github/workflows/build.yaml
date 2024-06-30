@@ -1,4 +1,4 @@
-name: ci
+name: Build
 on:
   push:
     branches:
@@ -12,22 +12,34 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    name: Build - ${{ matrix.platform.build_for }}
     permissions:
       contents: read
       packages: write
       attestations: write
       id-token: write
     strategy:
-      fail-fast: false
       matrix:
         platform:
-          - linux/amd64
-          - linux/arm64
+          - build_for: linux/amd64
+            os: ubuntu-20.04
+            target: x86_64-unknown-linux-gnu
+            bin: node-provider-labeler
+            name: node-provider-labeler-linux-x86_64
+            command: both
+
+          - build_for: linux/arm64
+            os: ubuntu-20.04
+            target: aarch64-unknown-linux-gnu
+            bin: node-provider-labeler
+            name: node-provider-labeler-linux-aarch64
+            command: both
+
+    runs-on: ${{ matrix.platform.os }}
     steps:
       - name: Prepare
         run: |
-          platform=${{ matrix.platform }}
+          platform=${{ matrix.platform.build_for }}
           echo "PLATFORM_PAIR=${platform//\//-}" >> $GITHUB_ENV
 
       - name: Checkout
@@ -39,9 +51,6 @@ jobs:
         with:
           images: ${{ env.REGISTRY_IMAGE }}
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -52,13 +61,31 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Build binary
+        uses: houseabsolute/actions-rust-cross@v0
+        with:
+          command: ${{ matrix.platform.command }}
+          target: ${{ matrix.platform.target }}
+          args: "--locked --release"
+          strip: true
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform.name }}
+          path: target/${{ matrix.platform.target }}/release/node-provider-labeler
+          if-no-files-found: error
+          retention-days: 1
+
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: ${{ matrix.platform }}
+          platforms: ${{ matrix.platform.build_for }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            target=${{ matrix.platform.target }}/release
           outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
 
       - name: Export digest
@@ -74,7 +101,6 @@ jobs:
           path: /tmp/digests/*
           if-no-files-found: error
           retention-days: 1
-
   merge:
     runs-on: ubuntu-latest
     permissions:
@@ -91,6 +117,13 @@ jobs:
           path: /tmp/digests
           pattern: digests-*
           merge-multiple: true
+
+      - name: Download binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: bins
+          pattern: node-provider-labeler-*
+          merge-multiple: false
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -118,13 +151,20 @@ jobs:
         run: |
           docker buildx imagetools inspect ${{ env.REGISTRY_IMAGE }}:${{ steps.meta.outputs.version }}
 
-      - name: Create GitHub Release
+      - name: Rename binaries
+        run: |
+          mv bins/node-provider-labeler-linux-x86_64/node-provider-labeler node-provider-labeler-linux-x86_64
+          mv bins/node-provider-labeler-linux-aarch64/node-provider-labeler node-provider-labeler-linux-aarch64
+
+      - name: Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref_name }}
           draft: false
           prerelease: false
+          generate_release_notes: true
+          name: node-provider-labeler ${{ github.ref_name }}
+          fail_on_unmatched_files: true
+          files: |
+            node-provider-labeler-linux-x86_64
+            node-provider-labeler-linux-aarch64

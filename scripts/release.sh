@@ -23,7 +23,7 @@ extract_version_from_cargo_toml() {
 
 extract_chart_version_from_chart_yaml() {
     local file_path=$1
-    grep -E '^version: "[0-9]+"' "$file_path" | cut -d '"' -f 2
+    grep -E '^version: "[0-9]+\.[0-9]+\.[0-9]+"' "$file_path" | cut -d '"' -f 2
 }
 
 bump_version_in_cargo_toml() {
@@ -37,6 +37,13 @@ bump_appversion_in_chart_yaml() {
     local file_path=$1
     local new_version=$2
     sed -i.bak -E "s/^appVersion: \".*\"/appVersion: \"$new_version\"/" "$file_path"
+    rm "${file_path}.bak"
+}
+
+bump_appversion_in_values_yaml() {
+    local file_path=$1
+    local new_version=$2
+    sed -i.bak -E 's/^([[:space:]]*tag:[[:space:]]*").*(")$/\1'"v$new_version"'\2/' "$file_path"
     rm "${file_path}.bak"
 }
 
@@ -56,22 +63,23 @@ fi
 release_type=$1
 
 cargo_toml_path="Cargo.toml"
-chart_yaml_path="chart/Chart.yaml"
+chart_yaml_path="charts/node-provider-labeler/Chart.yaml"
+values_yaml_path="charts/node-provider-labeler/values.yaml"
 
 if [ "$release_type" == "app" ] || [ "$release_type" == "both" ]; then
     current_version=$(extract_version_from_cargo_toml "$cargo_toml_path")
     new_version=$(increment_version "$current_version")
     bump_version_in_cargo_toml "$cargo_toml_path" "$new_version"
     bump_appversion_in_chart_yaml "$chart_yaml_path" "$new_version"
-    echo "Bumped application version to $new_version in Cargo.toml and appVersion in Chart.yaml"
+    bump_appversion_in_values_yaml "$values_yaml_path" "$new_version"
+    echo "Bumped application version to $new_version in Cargo.toml, appVersion in Chart.yaml, and image.tag in values.yaml"
 fi
 
 if [ "$release_type" == "chart" ] || [ "$release_type" == "both" ]; then
     current_chart_version=$(extract_chart_version_from_chart_yaml "$chart_yaml_path")
-    if [[ -z "$current_chart_version" ]]; then
-        current_chart_version=0
-    fi
-    new_chart_version=$((current_chart_version + 1))
+    new_chart_version=$(increment_version "$current_chart_version")
     bump_chart_version_in_chart_yaml "$chart_yaml_path" "$new_chart_version"
     echo "Bumped chart version to $new_chart_version in Chart.yaml"
 fi
+
+cargo build
