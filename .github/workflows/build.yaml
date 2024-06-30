@@ -3,9 +3,9 @@ on:
   push:
     branches:
       - "main"
-      - "gha"
     tags:
       - "v*"
+    pull_request:
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
