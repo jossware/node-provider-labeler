@@ -17,5 +17,5 @@ spec:
     spec:
       serviceAccountName: node-provider-labeler
       containers:
-        - image: ghcr.io/ryane/node-provider-labeler:main
+        - image: ghcr.io/jossware/node-provider-labeler:main
           name: node-provider-labeler
