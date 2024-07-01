@@ -9,4 +9,4 @@ To learn more about the release, try:
 
 To access the http endpoint from your local host, try:
 
-  $ kubectl -n ${{ .Release.Namespace }} port-forward svc/{{ include "node-provider-labeler.fullname" . }} 8080:8080
+  $ kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "node-provider-labeler.fullname" . }} 8080:8080
