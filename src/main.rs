@@ -35,8 +35,8 @@ enum Error {
 #[command(version, about, long_about = None)]
 struct Args {
     /// The label key and optional template to use for the label value.
-    /// The default is "provider-id={:last}" if no other labels or annotations are configured.
-    /// Can be repeated to add multiple labels.
+    /// The default is "provider-id={:last}" if there are no other labels or annotations configured.
+    /// Repeat to add multiple labels.
     ///
     /// Examples:
     /// * --label=label-key
@@ -44,7 +44,7 @@ struct Args {
     #[arg(short, long, verbatim_doc_comment)]
     label: Option<Vec<String>>,
     /// The annotation key and optional template to use for the annotation value
-    /// Can be repeated to add multiple annotations.
+    /// Repeat to add multiple annotations.
     ///
     /// Examples:
     /// * --annotation=annotation-key
