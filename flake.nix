@@ -1,5 +1,5 @@
 {
-  description = "labels (or annotates) Kubernetes Nodes with information from `.spec.ProviderID`";
+  description = "labels (or annotates) Kubernetes Nodes with information from `.spec.providerID`";
 
   inputs = {
     nixpkgs.url = "nixpkgs"; # Resolves to github:NixOS/nixpkgs
@@ -17,6 +17,13 @@
         nixpkgs.follows = "nixpkgs";
       };
     };
+    konvert = {
+      url = "github:kumorilabs/konvert";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        flake-utils.follows = "flake-utils";
+      };
+    };
   };
 
   outputs =
@@ -26,6 +33,7 @@
       crane,
       rust-overlay,
       flake-utils,
+      konvert,
     }:
     flake-utils.lib.eachDefaultSystem (
       system:
@@ -108,6 +116,31 @@
           '';
         };
 
+        create-kind-cluster = pkgs.writeScriptBin "create-kind-cluster" ''
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          TMPFILE=$(mktemp)
+          cat << EOF > $TMPFILE
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          name: node-prov
+          nodes:
+          - role: control-plane
+          - role: worker
+          - role: worker
+          EOF
+
+          kind create cluster --config $TMPFILE
+          rm -f $TMPFILE
+        '';
+
+        delete-kind-cluster = pkgs.writeScriptBin "delete-kind-cluster" ''
+          #!/usr/bin/env bash
+          set -euo pipefail
+          kind delete cluster --name node-prov
+        '';
+
         create-cluster = pkgs.writeScriptBin "create-cluster" ''
           #!/usr/bin/env bash
           set -euo pipefail
@@ -180,11 +213,14 @@
             kwokctl
             kustomize
             kfilt
+            konvert.packages.${system}.konvert
             kubernetes-helm
+            create-kind-cluster
             create-cluster
             create-nodes
             delete-nodes
             delete-cluster
+            delete-kind-cluster
             remove-label
             remove-annotation
             pest-ide-tools

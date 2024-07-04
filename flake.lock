@@ -38,6 +38,29 @@
         "type": "github"
       }
     },
+    "konvert": {
+      "inputs": {
+        "flake-utils": [
+          "flake-utils"
+        ],
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1720057370,
+        "narHash": "sha256-MTMsxJme1RRSXHEWvBHCnE86EPlZYDrQJJu+tWm8TSI=",
+        "owner": "kumorilabs",
+        "repo": "konvert",
+        "rev": "933eef0b7aecd80bac330dbb4589481bc26a2073",
+        "type": "github"
+      },
+      "original": {
+        "owner": "kumorilabs",
+        "repo": "konvert",
+        "type": "github"
+      }
+    },
     "nixpkgs": {
       "locked": {
         "lastModified": 1714184256,
@@ -56,6 +79,7 @@
       "inputs": {
         "crane": "crane",
         "flake-utils": "flake-utils",
+        "konvert": "konvert",
         "nixpkgs": "nixpkgs",
         "rust-overlay": "rust-overlay"
       }
