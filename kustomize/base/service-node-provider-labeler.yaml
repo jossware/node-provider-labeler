@@ -1,0 +1,24 @@
+# Source: node-provider-labeler/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: node-provider-labeler
+  labels:
+    helm.sh/chart: node-provider-labeler-0.15.0
+    app.kubernetes.io/name: node-provider-labeler
+    app.kubernetes.io/instance: node-provider-labeler
+    app.kubernetes.io/version: "0.5.0"
+    app.kubernetes.io/managed-by: konvert
+  annotations:
+    konvert.kumorilabs.io/generated-by: 'konvert'
+    konvert.kumorilabs.io/chart: '../charts/node-provider-labeler'
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: node-provider-labeler
+    app.kubernetes.io/instance: node-provider-labeler

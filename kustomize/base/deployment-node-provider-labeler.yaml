@@ -1,0 +1,45 @@
+# Source: node-provider-labeler/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: node-provider-labeler
+  labels:
+    helm.sh/chart: node-provider-labeler-0.15.0
+    app.kubernetes.io/name: node-provider-labeler
+    app.kubernetes.io/instance: node-provider-labeler
+    app.kubernetes.io/version: "0.5.0"
+    app.kubernetes.io/managed-by: konvert
+  annotations:
+    konvert.kumorilabs.io/generated-by: 'konvert'
+    konvert.kumorilabs.io/chart: '../charts/node-provider-labeler'
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: node-provider-labeler
+      app.kubernetes.io/instance: node-provider-labeler
+  template:
+    metadata:
+      labels:
+        helm.sh/chart: node-provider-labeler-0.15.0
+        app.kubernetes.io/name: node-provider-labeler
+        app.kubernetes.io/instance: node-provider-labeler
+        app.kubernetes.io/version: "0.5.0"
+        app.kubernetes.io/managed-by: Helm
+    spec:
+      serviceAccountName: node-provider-labeler
+      securityContext: {}
+      containers:
+      - name: node-provider-labeler
+        securityContext: {}
+        image: "ghcr.io/jossware/node-provider-labeler:v0.5.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+        resources: {}

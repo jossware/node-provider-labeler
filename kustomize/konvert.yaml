@@ -1,0 +1,11 @@
+apiVersion: konvert.kumorilabs.io/v1alpha1
+kind: Konvert
+metadata:
+  name: node-provider-labeler
+  annotations:
+    config.kubernetes.io/local-config: "true"
+spec:
+  kustomize: true
+  chart: ../charts/node-provider-labeler
+  namespace: node-provider-labeler
+  path: base

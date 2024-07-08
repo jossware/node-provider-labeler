@@ -48,11 +48,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1720057370,
-        "narHash": "sha256-MTMsxJme1RRSXHEWvBHCnE86EPlZYDrQJJu+tWm8TSI=",
+        "lastModified": 1720402143,
+        "narHash": "sha256-bOu6l6TUyapUg/43ldCNoipF9peTnyqwz327GyL8LWM=",
         "owner": "kumorilabs",
         "repo": "konvert",
-        "rev": "933eef0b7aecd80bac330dbb4589481bc26a2073",
+        "rev": "833cd6e199e8d37c11056cb442c783dd9ad718bb",
         "type": "github"
       },
       "original": {
