@@ -34,6 +34,19 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if and .Values.templates (or .Values.templates.labels .Values.templates.annotations) }}
+          args:
+            {{- if .Values.templates.labels }}
+            {{- range .Values.templates.labels }}
+            - "--label={{ .key }}={{ .value }}"
+            {{- end }}
+            {{- end }}
+            {{- if .Values.templates.annotations }}
+            {{- range .Values.templates.annotations }}
+            - "--annotation={{ .key }}={{ .value }}"
+            {{- end }}
+            {{- end }}
+            {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}
