@@ -123,14 +123,15 @@ values).
 
 Let's take a look at a concrete example for AWS: "aws://us-west-2/i-0abcdef1234567890". 
 
-| Token       | Label Value                   | Annotation Value              |
-|-------------|-------------------------------|-------------------------------|
-| {:provider} | aws                           | aws                           |
-| {:last}     | i-0abcdef1234567890           | i-0abcdef1234567890           |
-| {:first}    | us-west-2                     | us-west-2                     |
-| {:all}      | us-west-2_i-0abcdef1234567890 | us-west-2/i-0abcdef1234567890 |
-| {0}         | us-west-2                     | us-west-2                     |
-| {1}         | i-0abcdef1234567890           | i-0abcdef1234567890           |
+| Token       | Label Value                       | Annotation Value                    |
+|-------------|-----------------------------------|-------------------------------------|
+| {:provider} | aws                               | aws                                 |
+| {:last}     | i-0abcdef1234567890               | i-0abcdef1234567890                 |
+| {:first}    | us-west-2                         | us-west-2                           |
+| {:all}      | us-west-2_i-0abcdef1234567890     | us-west-2/i-0abcdef1234567890       |
+| {:url}      | aws_us-west-2_i-0abcdef1234567890 | aws://us-west-2/i-0abcdef1234567890 |
+| {0}         | us-west-2                         | us-west-2                           |
+| {1}         | i-0abcdef1234567890               | i-0abcdef1234567890                 |
 
 Of course, you can combine tokens to define your value. Examples:
 
