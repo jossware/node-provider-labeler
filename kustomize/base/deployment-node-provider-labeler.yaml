@@ -4,10 +4,10 @@ kind: Deployment
 metadata:
   name: node-provider-labeler
   labels:
-    helm.sh/chart: node-provider-labeler-0.16.0
+    helm.sh/chart: node-provider-labeler-0.17.0
     app.kubernetes.io/name: node-provider-labeler
     app.kubernetes.io/instance: node-provider-labeler
-    app.kubernetes.io/version: "0.6.0"
+    app.kubernetes.io/version: "0.7.0"
     app.kubernetes.io/managed-by: konvert
   annotations:
     konvert.kumorilabs.io/generated-by: 'konvert'
@@ -21,10 +21,10 @@ spec:
   template:
     metadata:
       labels:
-        helm.sh/chart: node-provider-labeler-0.16.0
+        helm.sh/chart: node-provider-labeler-0.17.0
         app.kubernetes.io/name: node-provider-labeler
         app.kubernetes.io/instance: node-provider-labeler
-        app.kubernetes.io/version: "0.6.0"
+        app.kubernetes.io/version: "0.7.0"
         app.kubernetes.io/managed-by: Helm
     spec:
       serviceAccountName: node-provider-labeler
@@ -32,7 +32,7 @@ spec:
       containers:
       - name: node-provider-labeler
         securityContext: {}
-        image: "ghcr.io/jossware/node-provider-labeler:v0.6.0"
+        image: "ghcr.io/jossware/node-provider-labeler:v0.7.0"
         imagePullPolicy: IfNotPresent
         ports:
         - name: http

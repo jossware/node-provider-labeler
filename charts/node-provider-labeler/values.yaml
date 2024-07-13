@@ -7,7 +7,7 @@ replicaCount: 1
 image:
   repository: ghcr.io/jossware/node-provider-labeler
   pullPolicy: IfNotPresent
-  tag: "v0.6.0"
+  tag: "v0.7.0"
 
 # Optionally define templates for labels and/or annotations. If not defined, the
 # chart will create the default label and value
