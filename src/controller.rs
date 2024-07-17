@@ -1,11 +1,4 @@
-use crate::{
-    diagnostics::Diagnostics,
-    meta::MetadataKey,
-    metrics::Metrics,
-    provider_id::ProviderID,
-    template::{AnnotationTemplate, LabelTemplate, Template},
-    Error, State,
-};
+use crate::{diagnostics::Diagnostics, meta::MetadataKey, metrics::Metrics, State};
 use futures::StreamExt;
 use k8s_openapi::api::core::v1::Node;
 use kube::{
@@ -18,6 +11,11 @@ use kube::{
         watcher, Config, Controller,
     },
     Api, Client,
+};
+use node_provider_labeler::Error;
+use node_provider_labeler::{
+    provider_id::ProviderID,
+    template::{AnnotationTemplate, LabelTemplate, Template},
 };
 use std::{str::FromStr, sync::Arc, time::Duration};
 use time::OffsetDateTime;
@@ -278,6 +276,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use node_provider_labeler::provider_id::ProviderID;
 
     #[test]
     fn test_calculate_metadata_pairs() {

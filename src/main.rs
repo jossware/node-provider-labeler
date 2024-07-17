@@ -2,34 +2,14 @@ mod controller;
 mod diagnostics;
 mod meta;
 mod metrics;
-mod provider_id;
-mod template;
 
 use axum::{extract, http::StatusCode, routing::get, Router};
 use clap::Parser;
 use diagnostics::Diagnostics;
 use prometheus::{Encoder, TextEncoder};
-use provider_id::ProviderIDError;
 use std::{future::IntoFuture, process::ExitCode, sync::Arc};
-use thiserror::Error;
 use tokio::{net::TcpListener, sync::RwLock};
 use tracing::{error, warn};
-
-#[derive(Error, Debug)]
-enum Error {
-    #[error("kube error: {0}")]
-    Kube(#[from] kube::Error),
-    #[error("MissingObjectKey: {0}")]
-    MissingObjectKey(&'static str),
-    #[error("ProviderIDError: {0}")]
-    ProviderID(#[from] ProviderIDError),
-    #[error("ParseIntError: {0}")]
-    ParseInt(#[from] std::num::ParseIntError),
-    #[error("TemplateParseError: {0}")]
-    TemplateParser(String),
-    #[error("MetadataKeyError: {0}")]
-    MetadataKey(String),
-}
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
