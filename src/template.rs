@@ -1,4 +1,3 @@
-#[allow(unused_imports)]
 use crate::{provider_id::ProviderID, Error};
 use pest::Parser;
 use pest_derive::Parser;
@@ -13,7 +12,7 @@ pub trait Template {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct LabelTemplate(String);
+pub struct LabelTemplate(String);
 
 impl FromStr for LabelTemplate {
     type Err = Error;
@@ -35,7 +34,7 @@ impl Template for LabelTemplate {
 }
 
 #[derive(Default, Debug)]
-pub(crate) struct AnnotationTemplate(String);
+pub struct AnnotationTemplate(String);
 
 impl FromStr for AnnotationTemplate {
     type Err = Error;
