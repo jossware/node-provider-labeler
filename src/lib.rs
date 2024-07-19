@@ -17,4 +17,8 @@ pub enum Error {
     TemplateParser(String),
     #[error("MetadataKeyError: {0}")]
     MetadataKey(String),
+    #[error("JoinError: {0}")]
+    JoinError(#[from] tokio::task::JoinError),
+    #[error("ServerError: {0}")]
+    ServerError(#[from] std::io::Error),
 }
