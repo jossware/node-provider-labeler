@@ -6,9 +6,11 @@ mod metrics;
 use axum::{extract, http::StatusCode, routing::get, Router};
 use clap::Parser;
 use diagnostics::Diagnostics;
+use futures::TryFutureExt;
+use node_provider_labeler::Error;
 use prometheus::{Encoder, TextEncoder};
 use std::{future::IntoFuture, process::ExitCode, sync::Arc};
-use tokio::{net::TcpListener, sync::RwLock};
+use tokio::{net::TcpListener, sync::RwLock, task::JoinHandle};
 use tracing::{error, warn};
 
 #[derive(Parser, Debug)]
@@ -73,7 +75,8 @@ async fn main() -> ExitCode {
         .with_graceful_shutdown(async {
             tokio::signal::ctrl_c().await.unwrap();
         })
-        .into_future();
+        .into_future()
+        .map_err(Error::from);
     let controller = controller::run(
         client,
         state,
@@ -82,25 +85,34 @@ async fn main() -> ExitCode {
         args.requeue_duration,
     );
 
-    let (c, s) = tokio::join!(controller, server);
+    tracing::info!("starting controller");
+    tracing::info!("starting server");
 
-    match c {
-        Ok(_) => (),
-        Err(e) => {
-            error!({ error = e.to_string() }, "unable to run controller");
-            return ExitCode::FAILURE;
-        }
-    }
+    let controller = tokio::spawn(controller);
+    let server = tokio::spawn(server);
 
-    match s {
-        Ok(_) => (),
-        Err(e) => {
-            error!({ error = e.to_string() }, "unable to run server");
+    match tokio::try_join!(run(server, "server"), run(controller, "controller")) {
+        Ok(_) => {}
+        Err(_) => {
             return ExitCode::FAILURE;
         }
     }
 
     ExitCode::SUCCESS
+}
+
+async fn run(handle: JoinHandle<Result<(), Error>>, name: &str) -> Result<(), Error> {
+    match handle.await {
+        Ok(Ok(())) => Ok(()),
+        Ok(Err(e)) => {
+            error!("{name}: {e}");
+            Err(e)
+        }
+        Err(e) => {
+            error!("{name}: {e}");
+            Err(e.into())
+        }
+    }
 }
 
 async fn metrics(extract::State(state): extract::State<State>) -> (StatusCode, Vec<u8>) {
