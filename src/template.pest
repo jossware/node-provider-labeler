@@ -5,7 +5,7 @@ provider = { "{:provider}" }
 url = { "{:url}" }
 idx = { ASCII_DIGIT+ }
 nth = { "{" ~ idx ~ "}" }
-char = { ASCII_ALPHANUMERIC | "." | "_" | "-" | "/" | " " }
+char = { ASCII }
 label_char = { ASCII_ALPHA | ASCII_DIGIT | "-" | "_" | "."}
 annotation = {
     SOI ~
