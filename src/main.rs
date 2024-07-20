@@ -91,7 +91,10 @@ async fn main() -> ExitCode {
     let controller = tokio::spawn(controller);
     let server = tokio::spawn(server);
 
-    match tokio::try_join!(run(server, "server"), run(controller, "controller")) {
+    match tokio::try_join!(
+        run_task("server", server),
+        run_task("controller", controller)
+    ) {
         Ok(_) => {}
         Err(_) => {
             return ExitCode::FAILURE;
@@ -101,15 +104,15 @@ async fn main() -> ExitCode {
     ExitCode::SUCCESS
 }
 
-async fn run(handle: JoinHandle<Result<(), Error>>, name: &str) -> Result<(), Error> {
+async fn run_task(name: &str, handle: JoinHandle<Result<(), Error>>) -> Result<(), Error> {
     match handle.await {
         Ok(Ok(())) => Ok(()),
         Ok(Err(e)) => {
-            error!("{name}: {e}");
+            error!(name = name, "error" = e.to_string(), "task error");
             Err(e)
         }
         Err(e) => {
-            error!("{name}: {e}");
+            error!(name = name, "error" = e.to_string(), "spawn error");
             Err(e.into())
         }
     }
