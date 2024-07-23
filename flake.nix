@@ -214,6 +214,7 @@
             kustomize
             kfilt
             konvert.packages.${system}.konvert
+            oras
             kubernetes-helm
             create-kind-cluster
             create-cluster
