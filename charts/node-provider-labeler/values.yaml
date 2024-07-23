@@ -2,16 +2,20 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
+# -- The number of replicas to run
 replicaCount: 1
 
 image:
+  # -- The image to use in the controller deployment
   repository: ghcr.io/jossware/node-provider-labeler
-  pullPolicy: IfNotPresent
+  # -- The tag of the image
   tag: "v0.7.0"
+  # -- The image pull policy
+  pullPolicy: IfNotPresent
 
-# Optionally define templates for labels and/or annotations. If not defined, the
+# -- Optionally define templates for labels and/or annotations. If not defined, the
 # chart will create the default label and value
-#
+templates: {}
 # templates:
 #   labels:
 #     - key: instance-id
@@ -20,31 +24,40 @@ image:
 #     - key: aws-region
 #       value: "{:first}"
 
+# -- Secrets with credentials to pull images from a private registry
 imagePullSecrets: []
+
+# -- Provide a name in place of the default
 nameOverride: ""
+# -- String to fully override `"node-provider-labeler.fullname"`
 fullnameOverride: ""
 
 serviceAccount:
-  # Specifies whether a service account should be created
+  # -- Specifies whether a service account should be created
   create: true
-  # Automatically mount a ServiceAccount's API credentials?
+  # -- Automatically mount a ServiceAccount's API credentials?
   automount: true
-  # Annotations to add to the service account
+  # -- Annotations to add to the service account
   annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
+  # -- The name of the service account to use.
+  # -- If not set and create is true, a name is generated using the fullname template
   name: ""
 
 rbac:
+  # -- Specifies whether RBAC roles and bindings should be created
   create: true
 
+# -- Annotations to be added to the pods
 podAnnotations: {}
+# -- Labels to be added to the pods
 podLabels: {}
 
+# -- Pod level security context
 podSecurityContext:
   {}
   # fsGroup: 2000
 
+# -- Container level security context
 securityContext:
   {}
   # capabilities:
@@ -55,9 +68,12 @@ securityContext:
   # runAsUser: 1000
 
 service:
+  # -- Metrics service type
   type: ClusterIP
+  # -- Metrics service port
   port: 8080
 
+# -- Resource limits and requests for the deployment
 resources:
   {}
   # We usually recommend not to specify default resources and to leave this as a conscious
@@ -71,26 +87,32 @@ resources:
   #   cpu: 100m
   #   memory: 128Mi
 
+# -- Server readiness probe
 readinessProbe:
   httpGet:
+    # -- HTTP path for readiness probe
     path: /health
+    # -- Port for readiness probe
     port: http
 
-# Additional volumes on the output Deployment definition.
+# -- Additional volumes to add on the deployment.
 volumes: []
 # - name: foo
 #   secret:
 #     secretName: mysecret
 #     optional: false
 
-# Additional volumeMounts on the output Deployment definition.
+# -- Additional volumeMounts to add to the deployment.
 volumeMounts: []
 # - name: foo
 #   mountPath: "/etc/foo"
 #   readOnly: true
 
+# -- Node selector.
 nodeSelector: {}
 
+# -- Tolerations for use with node taints.
 tolerations: []
 
+# -- Assign custom affinity rules to the deployment.
 affinity: {}

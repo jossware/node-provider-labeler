@@ -209,6 +209,7 @@
         devShell = pkgs.mkShell {
           nativeBuildInputs = nativeBuildInputs;
           buildInputs = with pkgs; [
+            helm-docs
             kubectl
             kwokctl
             kustomize

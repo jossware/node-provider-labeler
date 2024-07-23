@@ -1,0 +1,20 @@
+# node-provider-labeler Helm Chart
+{{ template "chart.deprecationWarning" . }}
+
+{{ template "chart.badgesSection" . }}
+
+{{ template "chart.description" . }}.
+
+## Installation
+
+``` shell
+helm install node-provider-labeler oci://ghcr.io/jossware/charts/node-provider-labeler \
+    --namespace node-provider-labeler \
+    --create-namespace
+```
+
+{{ template "chart.valuesSection" . }}
+
+## Contributing
+
+Please refer to [CONTRIBUTING.MD](../CONTRIBUTING.md).
