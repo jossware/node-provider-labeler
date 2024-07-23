@@ -1,4 +1,5 @@
 ![build](https://github.com/jossware/node-provider-labeler/actions/workflows/build.yaml/badge.svg)  ![release](https://github.com/jossware/node-provider-labeler/actions/workflows/release.yaml/badge.svg)  ![chart](https://github.com/jossware/node-provider-labeler/actions/workflows/chart.yaml/badge.svg)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/node-provider-labeler)](https://artifacthub.io/packages/search?repo=node-provider-labeler)
 
 # node-provider-labeler
 
