@@ -28,6 +28,36 @@ Rinse and repeat as necessary.
 
 Cleanup with `delete-nodes` and `delete-cluster`.
 
+## Releasing
+
+`release.sh` performs much of the tedium that comes with a new release. Use it
+to prep a new version of the controller, a new version of the Helm chart, or
+both.
+
+```shell
+# release just the app
+./scripts/release.sh app                                                                                                                │
+# release just the chart
+./scripts/release.sh chart
+# release the app and the chart
+./scripts/release.sh both                                                                                                               │
+```
+
+After running, review the diff, commit, create a pull request, and merge once
+approved. At this point, you can create a tag for the controller or chart
+release. For example:
+
+```shell
+# chart tag
+git tag chart-0.18.0 --message "chart 0.18.0"
+
+# controller tag
+git tag v0.8.0 --message "node-provider-labeler 0.8.0"
+
+# push tag
+git push origin --tags
+```
+
 ## License
 
 All code in this repository is under the or the [MIT] license.
