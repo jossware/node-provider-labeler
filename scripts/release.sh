@@ -87,6 +87,14 @@ if [ "$release_type" == "chart" ] || [ "$release_type" == "both" ]; then
 
     # Generate kustomize base
     konvert -f "$kustomize_base_path"
+
+    # publish artifacthub metadata, must be authenticated to ghcr.io
+    pushd charts/node-provider-labeler
+    oras push \
+        ghcr.io/jossware/charts/node-provider-labeler:artifacthub.io \
+        --config /dev/null:application/vnd.cncf.artifacthub.config.v1+yaml \
+        artifacthub-repo.yml:application/vnd.cncf.artifacthub.repository-metadata.layer.v1.yaml
+    popd
 fi
 
 cargo build
