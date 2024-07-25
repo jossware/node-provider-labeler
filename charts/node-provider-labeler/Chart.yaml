@@ -4,3 +4,16 @@ description: Set Kubernetes Node metadata from cloud provider IDs
 type: application
 appVersion: "0.7.0"
 version: "0.19.0"
+keywords:
+  - kubernetes
+  - nodes
+  - monitoring
+home: https://github.com/jossware/node-provider-labeler/
+sources:
+  - https://github.com/jossware/node-provider-labeler/
+maintainers:
+  - name: ryane
+    email: ryan@jossware.com
+annotations:
+  artifacthub.io/category: monitoring-logging
+  artifacthub.io/license: MIT
