@@ -5,6 +5,32 @@
 
 {{ template "chart.description" . }}.
 
+## Configuration
+
+By default, node-provider-labeler will label nodes with a `provider-id` key and
+with the value set to the last component of the `spec.providerID` field.
+Examples:
+
+| Provider | Provider ID                                                                                         | provider-id Value                        |
+|----------|-----------------------------------------------------------------------------------------------------|------------------------------------------|
+| EKS      | aws://us-west-2/i-0abcdef1234567890                                                                 | i-0abcdef1234567890                      |
+| GKE      | gce://my-project/us-central1-a/gke-cluster-1-default-pool-12345678-abc1                             | gke-cluster-1-default-pool-12345678-abc1 |
+| AKS      | azure://subscriptions/00000000/resourceGroups/myrg/providers/Microsoft.Compute/virtualMachines/myVM | myvm                                     |
+| Kind     | kind://podman/node-prov/node-prov-worker                                                            | node-prov-worker                         |
+
+You can use the `templates` configuration in your values.yaml to customize the behavior.
+
+``` shell
+templates:
+  labels:
+    - key: instance-id
+      value: "{:last}"
+```
+
+See the
+[documentation](https://github.com/jossware/node-provider-labeler/blob/main/README.md#templates)
+for more on templates.
+
 ## Installation
 
 ``` shell
