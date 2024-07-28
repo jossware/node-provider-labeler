@@ -106,7 +106,7 @@ async fn reconcile(node: Arc<Node>, ctx: Arc<Ctx>) -> Result<Action, Error> {
         .as_ref();
 
     if let Some(provider_id) = provider_id {
-        let provider_id = ProviderID::new(provider_id)?;
+        let provider_id = ProviderID::new(node_name, provider_id)?;
         debug!({ node = node_name, provider_id = provider_id.to_string(), provider = provider_id.provider() }, "found provider id");
 
         let (new_labels, old_labels) =
@@ -280,7 +280,7 @@ mod tests {
 
     #[test]
     fn test_calculate_metadata_pairs() {
-        let provider_id = ProviderID::new("fake://region/instance").unwrap();
+        let provider_id = ProviderID::new("my-node-name", "fake://region/instance").unwrap();
 
         {
             // no renderers
