@@ -47,6 +47,10 @@ spec:
             {{- end }}
             {{- end }}
             {{- end }}
+          {{- with .Values.extraEnv }}
+          env:
+          {{- toYaml . | nindent 10 }}
+          {{- end }}
           ports:
             - name: http
               containerPort: {{ .Values.service.port }}

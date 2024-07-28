@@ -32,6 +32,11 @@ nameOverride: ""
 # -- String to fully override `"node-provider-labeler.fullname"`
 fullnameOverride: ""
 
+# -- [Environment variables](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/) for the controller container.
+extraEnv: []
+# - name: SOME_VAR
+#   value: 'some value'
+
 serviceAccount:
   # -- Specifies whether a service account should be created
   create: true

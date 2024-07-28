@@ -79,6 +79,11 @@
       "type": "string",
       "default": ""
     },
+    "extraEnv": {
+      "type": "array",
+      "default": [],
+      "items": {}
+    },
     "serviceAccount": {
       "type": "object",
       "properties": {
