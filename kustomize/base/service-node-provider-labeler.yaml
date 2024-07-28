@@ -4,10 +4,10 @@ kind: Service
 metadata:
   name: node-provider-labeler
   labels:
-    helm.sh/chart: node-provider-labeler-0.19.0
+    helm.sh/chart: node-provider-labeler-0.20.0
     app.kubernetes.io/name: node-provider-labeler
     app.kubernetes.io/instance: node-provider-labeler
-    app.kubernetes.io/version: "0.7.0"
+    app.kubernetes.io/version: "0.8.0"
     app.kubernetes.io/managed-by: konvert
   annotations:
     konvert.kumorilabs.io/generated-by: 'konvert'
