@@ -3,17 +3,18 @@ first = { "{:first}" }
 all = { "{:all}" }
 provider = { "{:provider}" }
 url = { "{:url}" }
+node = { "{:node}" }
 idx = { ASCII_DIGIT+ }
 nth = { "{" ~ idx ~ "}" }
 char = { ASCII }
 label_char = { ASCII_ALPHA | ASCII_DIGIT | "-" | "_" | "."}
 annotation = {
     SOI ~
-    ((last | first | all | provider | url | nth | char)+)+ ~
+    ((last | first | all | provider | url | node | nth | char)+)+ ~
     EOI
 }
 label = {
     SOI ~
-    ((last | first | all | provider | url | nth | label_char)+)+ ~
+    ((last | first | all | provider | url | node | nth | label_char)+)+ ~
     EOI
 }

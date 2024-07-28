@@ -72,6 +72,7 @@ fn do_render(template: &str, provider_id: &ProviderID, rule: Rule) -> Result<Str
             Rule::url => {
                 output.push_str(&provider_id.to_string());
             }
+            Rule::node => output.push_str(&provider_id.node_name()),
             Rule::nth => {
                 let nth = token.into_inner().next().unwrap().as_str();
                 let idx = nth.parse::<usize>()?;
@@ -109,6 +110,7 @@ mod tests {
         let _ = t("{:url}");
         let _ = t("{0}");
         let _ = t("{1}");
+        let _ = t("{:node}");
         let _ = t("{:last}-{:first}_{:all}.{:last}");
 
         assert!(LabelTemplate::from_str("{:incorrect}").is_err());
@@ -124,7 +126,7 @@ mod tests {
                 .unwrap()
         };
 
-        let id = ProviderID::new("aws://us-east-2/i-1234567890abcdef0").unwrap();
+        let id = ProviderID::new("my-node-name", "aws://us-east-2/i-1234567890abcdef0").unwrap();
 
         let output = t("aws-{:last}", &id);
         assert_eq!(output, "aws-i-1234567890abcdef0");
@@ -143,6 +145,9 @@ mod tests {
 
         let output = t("{:url}", &id);
         assert_eq!(output, "aws_us-east-2_i-1234567890abcdef0");
+
+        let output = t("{:node}", &id);
+        assert_eq!(output, "my-node-name");
 
         let output = t("{0}", &id);
         assert_eq!(output, "us-east-2");
@@ -166,7 +171,7 @@ mod tests {
                 .unwrap()
         };
 
-        let id = ProviderID::new("aws://us-east-2/i-1234567890abcdef0").unwrap();
+        let id = ProviderID::new("my-node-name", "aws://us-east-2/i-1234567890abcdef0").unwrap();
 
         let output = a("{:last}", &id);
         assert_eq!(output, "i-1234567890abcdef0");
@@ -182,6 +187,9 @@ mod tests {
 
         let output = a("{:url}", &id);
         assert_eq!(output, "aws://us-east-2/i-1234567890abcdef0");
+
+        let output = a("{:node}", &id);
+        assert_eq!(output, "my-node-name");
 
         let output = a("{0}", &id);
         assert_eq!(output, "us-east-2");
