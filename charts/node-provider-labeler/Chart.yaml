@@ -2,8 +2,8 @@ apiVersion: v2
 name: node-provider-labeler
 description: Set Kubernetes Node metadata from cloud provider IDs
 type: application
-appVersion: "0.7.0"
-version: "0.19.0"
+appVersion: "0.8.0"
+version: "0.20.0"
 keywords:
   - kubernetes
   - nodes
