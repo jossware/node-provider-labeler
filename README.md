@@ -133,6 +133,7 @@ Let's take a look at a concrete example for AWS: "aws://us-west-2/i-0abcdef12345
 | {:url}      | aws_us-west-2_i-0abcdef1234567890 | aws://us-west-2/i-0abcdef1234567890 |
 | {0}         | us-west-2                         | us-west-2                           |
 | {1}         | i-0abcdef1234567890               | i-0abcdef1234567890                 |
+| {:node}     | ip-192-168-1-123.ec2.internal     | ip-192-168-1-123.ec2.internal       |
 
 Of course, you can combine tokens to define your value. Examples:
 
@@ -141,3 +142,9 @@ Of course, you can combine tokens to define your value. Examples:
 | {:provider}-{:last} | aws-i-0abcdef1234567890          | aws-i-0abcdef1234567890          |
 | {:first}-{:last}    | us-west-2-i-0abcdef1234567890    | us-west-2-i-0abcdef1234567890    |
 | id_{:all}           | id_us-west-2_i-0abcdef1234567890 | id_us-west-2/i-0abcdef1234567890 |
+
+## kubectl-node-provider-id
+
+You can use the
+[kubectl-node-provider-id](https://github.com/jossware/kubectl-node-provider-id)
+plugin to more easily inspect `Node` provider IDs.
